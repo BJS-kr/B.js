@@ -1,5 +1,5 @@
 # B.js
-1. js 클론입니다. B.js인 이유는 제 이름의 이니셜이 bjs이기 때문입니다. 확장자도 bjs로 할 생각입니다.  
+1. js 컴파일러 클론입니다. B.js인 이유는 제 이름의 이니셜이 bjs이기 때문입니다. 확장자도 bjs로 할 생각입니다.  
 2. js를 클론하는 이유는 제가 nodejs메인이고 js와 ts를 좋아하기 때문입니다.  
 3. js의 핵심 스펙들을 구현할 생각입니다. js스러운 memory allocation이나 mark & sweep garbage collection 등 입니다.  
 4. js의 full-spec을 구현할 생각은 없기 때문에 prototype system을 구현하진 않을 것 같습니다.  
