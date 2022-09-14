@@ -26,3 +26,6 @@ enum class Kind {
   LeftBrace, RightBrace,
   LeftBracket, RightBracket
 };
+
+// 구현은 kind.cpp에
+Kind toKind(string);

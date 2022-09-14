@@ -8,7 +8,7 @@ using namespace std;
 
 static string::iterator current;
 
-Token scanNumberLiteral(string::iterator current) {
+Token scanNumberLiteral() {
   string string;
   while (isCharType(*current, CharType::NumberLiteral)) 
     string += *current++;
@@ -16,19 +16,80 @@ Token scanNumberLiteral(string::iterator current) {
   if (*current == '.') {
     string += *current++;
     while (isCharType(*current, CharType::NumberLiteral)) 
-    string += *current++;
+      string += *current++;
   }
 
   return Token{ Kind::NumberLiteral };
 };
-Token scanStringLiteral();
-Token scanIdentifierAndKeyword();
-Token scanOperatorAndPunctuator();
+
+Token scanStringLiteral() {
+  string string;
+  // 첫 글자는 따옴표이므로 건너뛰기 위해 1 증가
+  ++current;
+  while (isCharType(*current, CharType::StringLiteral))  
+    string += *current++;
+  
+  return Token{Kind::StringLiteral, string};
+};
+
+Token scanIdentifierAndKeyword() {
+  string string;
+  while (isCharType(*current, CharType::IdentifierAndKeyword))
+    string += *current++;
+  // kind.cpp에 정의된 toKind함수는 keyword의 종류를 판별하는 함수이다.
+  // 예약된 keyword가 아니라면 Unknown을 반환하는데
+  // 예약된 키워드도 아니고, 문자열이나 숫자도 아니라면 식별자일 것이다
+  // 그러므로 toKind가 Unknown반환시 Identifier로 Token을 생성하고,
+  // 아니라면 그에 맞는 kind를 넣는다.
+  Kind kind = toKind(string);
+  return Token{kind == Kind::Unknown ? Kind::Identifier : kind, string};
+};
+
+Token scanOperatorAndPunctuator() {
+  string string;
+  while (isCharType(*current, CharType::OperatorAndPunctuator)) 
+    string += *current++;
+  // 연산자는 항상 뒤에서부터(가장 긴 순서대로) 검증해야 한다
+  // 예를 들어보자. +=연산자를 앞에서부터 검증한다면, 나뉘어진 +와 =연산자가 두 개 있다고 인식할 것이다
+  // 그러므로 string을 뒤에서부터 제거하며 일치하는 kind가 있는지 검증한다
+  while (!string.empty() && toKind(string) == Kind::Unknown) {
+    // 하나 주의할 것은 pop_back하는 정확한 의미이다.
+    // current라는 iterator는 static으로 모든 함수들이 공통적으로 참조하고 있는 변수이다.
+    // 예를 들어 연산자와 구분자가 연속으로 쓰였다고 가정하자
+    // scanOperatorAndPunctuator함수는 연산자와 구분자를 구분하지 않고 string에 +=하므로
+    // 두 개가 하나의 string변수에 쓰여있을 가능성이 충분하다
+    // 그렇다면 일치하는 연산자나 구분자까지 iterator를 되돌린 후 거기서부터 연산을 다시 시작해야지 올바른 구문분석이 가능한것이다.
+    string.pop_back();
+    // 문자열을 하나 제거했으니 iterator도 되감아준다. 이후 되감긴 부분부터 scan함수의 while문이 연산을 계속 수행할 것이다.
+    --current;
+  }
+
+  if (string.empty()) {
+    cout << *current << "invalid operator or punctuator detected" << endl;
+  }
+
+  return Token{toKind(string), string};
+};
 
 bool isCharType(const char c, CharType type) {
   switch (type) {
+    case CharType::IdentifierAndKeyword:
+      return c >= '0' && c <= '9' ||
+             c >= 'a' && c <= 'z' ||
+             c >= 'A' && c <= 'Z';
+      break;
+    case CharType::StringLiteral:
+      return c >= 32 && c <= 126 && c != '\'';
+      break;
     case CharType::NumberLiteral:
       return c >= '0' && c <= '9';
+      break;
+    case CharType::OperatorAndPunctuator:
+      return c >= 33 && c <= 47 ||
+             c >= 58 && c <= 64 ||
+             c >= 91 && c <= 96 ||
+             c >= 123 && c <= 126;
+      break;
     default:
       return false;
   }
@@ -66,6 +127,7 @@ vector<Token> scan(string sourceCode) {
   while (*current != '\0') {
     switch (getCharType(*current)) {
       case CharType::WhiteSpace:
+        // 공백이라면 iterator전진! 단순히 전진만 하는 이유는 공백은 말 그대로 공백. 코드 분석 이후에는 쓸모없기 때문이다.
         ++current;
         break;
       case CharType::NumberLiteral:

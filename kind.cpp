@@ -55,3 +55,10 @@ static map<string, Kind> stringToKind = {
   {"[",           Kind::LeftBracket},
   {"]",           Kind::RightBracket},
 };
+
+Kind toKind(string string) {
+  // count는 존재하는지를 검증. at은 key에 대응되는 value가져오기
+  if (stringToKind.count(string)) return stringToKind.at(string);
+  // Unknown by default
+  return Kind::Unknown;
+}
