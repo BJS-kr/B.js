@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 #include "./Token.h"
-#include "./char_type.h"
+#include "./CharType.h"
 #include <iostream>
 
 using namespace std;
