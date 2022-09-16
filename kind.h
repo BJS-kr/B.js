@@ -8,7 +8,7 @@ enum class Kind {
   Identifier,
 
   Function, Return,
-  Variable,
+  Variable, Constant, Let,
   For, Break, Continue,
   If, Elif, Else,
   Print, PrintLine,

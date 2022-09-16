@@ -31,6 +31,52 @@ bool skipCurrentIf(Kind kind) {
   return true;
 }
 
+Expression* parseExpression() {
+  
+}
+
+// "var" 문자열을 발견하여 변수 선언임을 확인하고 변수 node를 만들기 위한 함수
+// function과 마찬가지로 var도 처리가 필요하지 않은 키워드이므로 current iterator를 전진시키고, 대신 Variable node를 생성한다.
+Variable* parseVariable() {
+  auto variable = new Variable();
+  skipCurrent(Kind::Variable);
+
+  variable->name = current->string;
+  skipCurrent(Kind::Identifier);
+  skipCurrent(Kind::Assignment); // 할당연산자 = 를 말한다. 설명이 없어도 생략이 가능함을 알 것이다.
+  // 사실 이는 var과 let에 한해서 js스펙에 걸맞지 않은데, const는 항상 즉시 초기화가 필요한 반면 var과 let은 초기화를 미룰 수 있기 때문이다.
+  // 그러므로 Assignment를 즉시 검증하는 것은 올바르지 않고, const의 경우에만 위의 구현이 올바르다.
+  // var이나 let이라면 즉시 초기화하는 경우와 미루는 경우를 둘다 판단해야하고, 미뤘다고 판단하면 expression은 undefined를 할당해야하는데 그냥 null로 퉁치겠다.
+  
+  variable->expression = parseExpression();
+  skipCurrent(Kind::Semicolon); // 이것도 js스펙과는 맞지 않는다. js는 semicolon없이도 구문 트리를 생성할 수 있기 때문이다. 
+  // 다만 세미콜론 없이도 줄바꿈으로 초기화 종료를 판단하는 것은 간단한데, 둘다 검증하면 되기 때문이다. 
+  // 그렇게 하려면 skipCurrent 함수의 인자는 vector<Kind>가 되어 여러 요소를 순회하며 검증하는 식이 되어야 할것이다. 템플릿 특수화를 하던가..
+  // 일단은 간단한 구현으로 완성하는게 먼저이니 굳이 구현하지 않겠다. 
+
+  return variable;
+}
+
+vector<Statement*> parseBlock() {
+  vector<Statement*> block;
+  // 함수 안에는 또 다른 block이 있을 수도 있는데 RightBrace로 종료를 검증하면 너무 안일한 것 아닌가?
+  while (current->kind != Kind::RightBrace) {
+    // 함수 블록안에 존재해서는 안되는 토큰들 검증
+    switch (current->kind) {
+      // 일단은 var 키워드로 변수를 선언하는 처리만 되어있다.
+      // 향후 let과 const도 처리하려면 이곳에서 처리를 추가하면 된다.
+      // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
+      case Kind::Variable:
+        block.push_back(parseVariable());
+        break;
+      case Kind::EndOfToken:
+        cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
+        exit(1);
+    }
+  }
+  return block;
+}
+
 // function이라는 키워드 자체는 아무 효용이 없다. 단지 함수를 선언하겠다는 것을 알리기 위해 사용된다.
 // 그러므로 function 토큰은 버린다. 여기서 버린다는 것은 current를 한칸 전진시키는 것을 의미한다.
 // 다만 function키워드를 통해 함수 노드를 생성해야 함을 알게 되었다(구문 트리에 넣어야하니까). 그러므로 new Function한다.

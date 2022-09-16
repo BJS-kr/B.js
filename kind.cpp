@@ -17,7 +17,11 @@ static map<string, Kind> stringToKind = {
 
   {"function",    Kind::Function},
   {"return",      Kind::Return},
+
   {"var",         Kind::Variable},
+  {"let"          Kind::Let}
+  {"const"        Kind::Constant},
+
   {"for",         Kind::For},
   {"break",       Kind::Break},
   {"continue",    Kind::Continue},
