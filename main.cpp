@@ -1,12 +1,13 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include "./Token.h"
+#include <iostream>
+#include "Token.h"
+#include "Main.h"
 
-using namespace std;
-
+using std::string;
+using std::vector;
 // https://stackoverflow.com/questions/22514855/arrow-operator-in-function-heading
-auto scan(string)->vector<Token>;
 
 vector<string> split(string input, char delimiter) {
     vector<string> answer;
@@ -27,6 +28,9 @@ auto main()->void {
     }
   )"""";
 
-  auto tokenList = scan(sourceCode);
+  vector<Token>  tokenList = scan(sourceCode);
+  Program* syntaxTree = parse(tokenList);
+
+  pintSyntaxTree(syntaxTree);
 }
 

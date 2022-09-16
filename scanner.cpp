@@ -1,10 +1,13 @@
 #include <string>
 #include <vector>
-#include "./Token.h"
-#include "./CharType.h"
+#include "Token.h"
+#include "CharType.h"
 #include <iostream>
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::cout;
+using std::endl;
 
 static string::iterator current;
 

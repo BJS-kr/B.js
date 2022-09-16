@@ -3,6 +3,10 @@
 #include<string>
 #include<map>
 #include"./Kind.h"
+
+using std::vector;
+using std::string;
+using std::map;
 /**
  * @brief 
  * if나 for문 등 내부에 문을 포함할 수 있으면 복합문, return 처럼 다른 문을 포함할 수 없으면 단일문이다.
@@ -10,7 +14,7 @@
  * 결론적으로 statement는 statement과 expression을 포함할 수 있다.
  */
 struct Program {
-  std::vector<struct Function*> functions;
+  vector<Function*> functions;
 };
 
 // 문
@@ -20,11 +24,11 @@ struct Expression {};
 // Function은 복합문이다. 그러므로 Statement를 상속받는다.
 struct Function: Statement {
   // 함수 이름
-  std::string name;
+  string name;
   // 파라미터들 이름
-  std::vector<std::string> parameters;
+  vector<string> parameters;
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
-  std::vector<Statement*> block;
+  vector<Statement*> block;
 };
 
 // Return은 단일문이다. 그러므로 Statement를 상속받는다.
@@ -36,7 +40,7 @@ struct Return: Statement {
 // 변수의 선언
 struct Variable: Statement {
   // 변수 이름
-  std::string name;
+  string name;
   // 변수 선언엔 식을 넣을 수 있다
   Expression* expression; 
 };
@@ -50,7 +54,7 @@ struct For: Statement {
   // 증감식
   Expression* expression;
   // for는 복합문이므로 Statement를 멤버로 가진다
-  std::vector<Statement*> block;
+  vector<Statement*> block;
 };
 
 // 반복을 중지하는 break이다
@@ -61,8 +65,8 @@ struct Continue: Statement {};
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
 struct If: Statement {
   Expression* conditions;
-  std::vector<Statement*> block;
-  std::vector<Statement*> elseBlock;
+  vector<Statement*> block;
+  vector<Statement*> elseBlock;
 };
 
 // print
@@ -70,7 +74,7 @@ struct Print: Statement {
   // 개행 여부를 표현한다. 기본값 false이다
   bool lineFeed = false;
   // 출력할 식 리스트
-  std::vector<Expression*> arguments;
+  vector<Expression*> arguments;
 };
 
 /**
@@ -142,7 +146,7 @@ struct Unary: Expression {
 // 인자 리스트를 통해 add(1,2)와 같은 함수 호출을 표현한다
 struct Call: Expression {
   Expression* sub;
-  std::vector<Expression*> arguments;
+  vector<Expression*> arguments;
 };
 
 // 원소 참조 표현식
@@ -163,11 +167,11 @@ struct SetElement: Expression {
 
 // 변수의 참조와 수정
 struct GetVariable: Expression {
-  std::string name;
+  string name;
 };
 
 struct SetVariable: Expression {
-  std::string name;
+  string name;
   Expression* value;
 };
 
@@ -186,14 +190,14 @@ struct NumberLiteral: Expression {
 };
 
 struct StringLiteral: Expression {
-  std::string string;
+  string string;
 };
 
 struct ArrayLiteral: Expression {
-  std::vector<Expression*> values;
+  vector<Expression*> values;
 };
 
 struct MapLiteral: Expression {
-  std::map<std::string, Expression*> values;
+  map<string, Expression*> values;
 };
 
