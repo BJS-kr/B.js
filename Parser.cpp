@@ -13,8 +13,10 @@ using std::endl;
 // static으로 선언해두고, parse함수에서 초기화한다.
 static vector<Token>::iterator current;
 
-// 이 함수는 토큰이 올바른지 current가 가리키는 토큰이 올바른지를 검사하기 위한 것으로
-// 매 단락마다 사용된다.
+// 이 함수는 current iterator를 전진시키기 위한 것으로
+// 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
+// 만약 Token의 Kind가 예상했던 것과 다르다면 bjs스크립트가 잘못 작성되었거나 컴파일러 구현 자체에 결함이 있는 것이므로 구문트리는 올바르게 생성될 수 없다.
+// 결론적으로 iterator를 전진시킴과 동시에 올바른 구현인지를 검증하는 함수다.
 void skipCurrent(Kind kind) {
   if (current->kind != kind) {
     cout << toString(kind) << " Token kind not matches"; 
