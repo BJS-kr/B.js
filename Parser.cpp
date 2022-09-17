@@ -33,8 +33,71 @@ bool skipCurrentIf(Kind kind) {
   return true;
 }
 
+/**
+ * @brief 연산자의 우선 순위
+ * 1. 산술연산자 곱하기와 나누기
+ * 2. 산술연산자 덧셈과 뺄셈
+ * 3. 관계 연산자
+ * 4. 논리 and 연산자
+ * 5. 논리 or 연산자
+ * 6. 대입연산자
+ * 
+ * 하지만 현재 구문 분석을 위해선 낮은 우선순위의 연산자부터 분석해야하므로 우선순위는 역순이 된다.
+ */
+Expression* parseAssignment() {
+  auto result = parseOr();
+  if (current->kind != Kind::Assignment) 
+    return result;
+  skipCurrent(Kind::Assignment);
+
+  if (auto getVariable = dynamic_cast<GetVariable*>(result)) {
+    auto varSetter = new SetVariable();
+    varSetter->name = getVariable->name;
+    varSetter->value = parseAssignment();
+    return varSetter;
+  }
+
+  if (auto getElement = dynamic_cast<GetElement*>(result)) {
+    auto elemSetter = new SetElement();
+    elemSetter->sub = getElement->sub;
+    elemSetter->index = getElement->index;
+    elemSetter->value = getElement->value;
+    return elemSetter;
+  }
+
+  cout << "invalid assignment attempt detected";
+  exit(1);
+}
+// 구문 분석의 다른 부분들에서 토큰의 종류에 따라 분석하던 것과는 달리,
+// 식은 아무런 토큰이 없다면 식이다. if, for, function등 문의 시작을 알리는 요소가 존재하지 않기 때문이다.
+// 혼동을 방지하자면, "BJS"나 숫자 1 등 연산자 없는 rvalue들도 모두 식의 범주에 포함된다.
+// 아무튼 아무 요소가 없으면 식임을 표현하기 위해 parseBlock함수 switch문의 default는 expression이다.
+/**
+ * @brief 식의 연산 순서에 대하여
+ * 구문 분석의 중요한 규칙이 있다. 연산자의 우선 순위에 대한 것이다.
+ * 1*2 + 3*4 라는 식을 생각해보자. 당연히 곱하기 연산이 우선순위이므로 2 + 12가 되는 것을 알 수 있다.
+ * 그러나 구문분석을 할 때는 우선 순위가 낮은 연산부터 트리를 구성해나가야 올바른 연산 결과를 얻을 수 있다.
+ * 위의 예를 그대로 생각해보면, + 연산은 루트노드가 되고 * 연산이 브랜치, 그리고 1,2와 3,4가 리프노드가 되어야 하는것이다.
+ * 단순 값도 식의 범주임을 떠올려보면 된다. 아무튼 루트노드부터 순서를 따져보면 일반적으로 알고 있는 연산순서의 역순이 되는것이다.
+ * 그리고 결과물은 리프노드로부터 루트노드로 향하여 완성되게 된다. 
+ */
 Expression* parseExpression() {
-  
+  return parseAssignment();
+}
+
+// 아래 함수는 단순히 parseExpression의 결과를 Statement로 감싸 반환하는 역할을 한다.
+// 이런 함수가 왜 필요할까? Node.h의 ExpressionStatement에도 설명해 두었지만,
+// 모든 식이 소비되는 것은 아니다.
+// 함수 본문에서 소비되지 않는 식을 발견하면 그 식은 소비되기 위하여 임의로 문에 감싸져야하므로
+// 소비되지 않는, 그러니까 문에 포함되지 않는 식을 발견했을때 문으로 감싸기 위한 함수라는 것이다.
+// 문으로 감싸야 하는 이유는 프로그램이 '구문'을 소비하기 때문이다. Statement타입이 아니면 소비할 수 없다는 것이다.
+ExpressionStatement* parseExpressionStatement() {
+  auto expressionStatement = new ExpressionStatement();
+  expressionStatement->expression = parseExpression();
+
+  skipCurrent(Kind::Semicolon);
+
+  return expressionStatement;
 }
 
 // "var" 문자열을 발견하여 변수 선언임을 확인하고 변수 node를 만들기 위한 함수
@@ -93,6 +156,8 @@ vector<Statement*> parseBlock() {
       case Kind::EndOfToken:
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
         exit(1);
+      default:
+        block.push_back(parseExpressionStatement());
     }
   }
   return block;
@@ -125,7 +190,7 @@ Function* parseFunction() {
   }
 
 Program* parse(vector<Token> tokens) {
-  auto result = new Program();
+  auto program = new Program();
   current = tokens.begin();
 
   while (current->kind != Kind::EndOfToken) {
@@ -133,13 +198,13 @@ Program* parse(vector<Token> tokens) {
       case Kind::Function:
         // static으로 선언된 current를 참조하므로 parseFunction에는 인자가 필요하지 않다.
         // 이런 접근 방식을 맘에 들어하지 않을 수도 있겠지만 편리한건 사실이다. 다만 함수형적인 측면으로 봤을 땐 참 그렇다.
-        result->functions.push_back(parseFunction());
+        program->functions.push_back(parseFunction());
         break;
       default:
         cout << "Cannot parse syntax tree: invalid kind of Token detected" << endl;
         exit(1);
     }    
   }
-  return result;
+  return program;
 }
 
