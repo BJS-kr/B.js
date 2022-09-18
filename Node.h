@@ -2,11 +2,13 @@
 #include<string>
 #include<string>
 #include<map>
+#include<any>
 #include"./Kind.h"
 
 using std::vector;
 using std::string;
 using std::map;
+using std::any;
 /**
  * @brief 
  * if나 for문 등 내부에 문을 포함할 수 있으면 복합문, return 처럼 다른 문을 포함할 수 없으면 단일문이다.
@@ -18,9 +20,13 @@ struct Program {
 };
 
 // 문
-struct Statement {};
+struct Statement {
+  virtual void interpret() = 0;
+};
 // 식
-struct Expression {};
+struct Expression {
+  virtual any interpret() = 0;
+};
 // Function은 복합문이다. 그러므로 Statement를 상속받는다.
 struct Function: Statement {
   // 함수 이름
@@ -29,12 +35,15 @@ struct Function: Statement {
   vector<string> parameters;
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
   vector<Statement*> block;
+  
+  void interpret();
 };
 
 // Return은 단일문이다. 그러므로 Statement를 상속받는다.
 struct Return: Statement {
   // Return은 단일문이다. 그러므로 다른 Statement를 가질 수 없다. 그러나 Expression은 가질 수 있다.
   Expression* expression;
+  void interpret();
 };
 
 // 변수의 선언
@@ -43,6 +52,7 @@ struct Variable: Statement {
   string name;
   // 변수 선언엔 식을 넣을 수 있다
   Expression* expression; 
+  void interpret();
 };
 
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
@@ -55,18 +65,24 @@ struct For: Statement {
   Expression* expression;
   // for는 복합문이므로 Statement를 멤버로 가진다
   vector<Statement*> block;
+  void interpret();
 };
 
 // 반복을 중지하는 break이다
-struct Break: Statement {};
+struct Break: Statement {
+  void interpret();
+};
 // 다음 순서 반복을 위한 continue이다
-struct Continue: Statement {}; 
+struct Continue: Statement {
+  void interpret();
+}; 
 
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
 struct If: Statement {
   Expression* conditions;
   vector<Statement*> block;
   vector<Statement*> elseBlock;
+  void interpret();
 };
 
 // print
@@ -75,6 +91,7 @@ struct Print: Statement {
   bool lineFeed = false;
   // 출력할 식 리스트
   vector<Expression*> arguments;
+  void interpret();
 };
 
 /**
@@ -89,6 +106,7 @@ struct Print: Statement {
 
 struct ExpressionStatement: Statement {
   Expression* expression;
+  void interpret();
 };
 
 /**
@@ -99,10 +117,12 @@ struct ExpressionStatement: Statement {
 struct Or: Expression {
   Expression* lhs;
   Expression* rhs;
+  any interpret();
 };
 struct And: Expression {
   Expression* lhs;
   Expression* rhs;
+  any interpret();
 };
 
 /**
@@ -115,12 +135,14 @@ struct Relational: Expression {
   Kind kind;
   Expression* lhs;
   Expression* rhs;
+  any interpret();
 };
 
 struct Arithmetic: Expression {
   Kind kind;
   Expression* lhs;
   Expression* rhs;
+  any interpret();
 };
 
 /**
@@ -140,6 +162,7 @@ struct Arithmetic: Expression {
 struct Unary: Expression {
   Kind kind;
   Expression* sub;
+  any interpret();
 };
 
 // 함수 호출 표현식
@@ -147,6 +170,7 @@ struct Unary: Expression {
 struct Call: Expression {
   Expression* sub;
   vector<Expression*> arguments;
+  any interpret();
 };
 
 // 원소 참조 표현식
@@ -154,6 +178,7 @@ struct Call: Expression {
 struct GetElement: Expression {
   Expression* sub;
   Expression* index;
+  any interpret();
 };
 
 // 원소 수정 표현식.
@@ -163,41 +188,51 @@ struct SetElement: Expression {
   Expression* sub;
   Expression* index;
   Expression* value;
+  any interpret();
 };
 
 // 변수의 참조와 수정
 struct GetVariable: Expression {
   string name;
+  any interpret();
 };
 
 struct SetVariable: Expression {
   string name;
   Expression* value;
+  any interpret();
 };
 
-// null의 범주는 자기 자신밖에 없으므로 따로 멤버를 가질 이유가 없다
-struct NullLiteral: Expression {};
+// null의 범주는 자기 자신밖에 없으므로 interpret외에 따로 멤버를 가질 이유가 없다
+struct NullLiteral: Expression {
+  any interpret();
+};
 
 // boolean의 범주는 true와 false로 이루어져 있다. 그러므로 멤버가 필요하며, 기본값은 보수적으로 false로 설정한다.
 // 참고로 C++의 primitive types들은 initial value가 없다. 아래의 노드들은 그러한 차이를 단적으로 보여주고 있는데,
 // bool과 double은 멤버를 명시적으로 초기화하는 반면, string은 초기값이 존재하기 때문에 초기화식이 없이 선언과 동시에 초기화가 이루어진다.
 struct BooleanLiteral: Expression {
   bool value = false;
+  any interpret();
 };
 
 struct NumberLiteral: Expression {
   double value = 0.0;
+  any interpret();
 };
 
 struct StringLiteral: Expression {
   string string;
+  any interpret();
 };
 
 struct ArrayLiteral: Expression {
   vector<Expression*> values;
+  any interpret();
 };
 
 struct MapLiteral: Expression {
   map<string, Expression*> values;
+  any interpret();
 };
 

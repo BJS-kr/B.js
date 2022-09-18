@@ -35,36 +35,86 @@ bool skipCurrentIf(Kind kind) {
 
 /**
  * @brief 연산자의 우선 순위
- * 1. 산술연산자 곱하기와 나누기
- * 2. 산술연산자 덧셈과 뺄셈
- * 3. 관계 연산자
- * 4. 논리 and 연산자
- * 5. 논리 or 연산자
- * 6. 대입연산자
+ * 1. 산술연산자 곱하기와 나누기 - 좌측 결합 연산
+ * 2. 산술연산자 덧셈과 뺄셈 - 좌측 결합 연산
+ * 3. 관계 연산자 - 좌측 결합 연산
+ * 4. 논리 and 연산자 - 좌측 결합 연산
+ * 5. 논리 or 연산자 - 좌측 결합 연산
+ * 6. 대입연산자 - 우측 결합 연산
  * 
  * 하지만 현재 구문 분석을 위해선 낮은 우선순위의 연산자부터 분석해야하므로 우선순위는 역순이 된다.
  */
-Expression* parseAssignment() {
-  auto result = parseOr();
-  if (current->kind != Kind::Assignment) 
-    return result;
-  skipCurrent(Kind::Assignment);
 
-  if (auto getVariable = dynamic_cast<GetVariable*>(result)) {
-    auto varSetter = new SetVariable();
-    varSetter->name = getVariable->name;
-    varSetter->value = parseAssignment();
-    return varSetter;
+Expression* parseOr() {
+  auto parsed = parseAnd();
+  // assign과 마찬가지로 or연산이 없다면 좌항"일수도" 있는 식이 평가된 후 식은 그냥 종료된 것이다.
+  // 그러므로 while을 거치지 않고 즉시 반환 될 것이다.
+  // 그러나 LogicalOr토큰이 존재한다면 parsed는 좌항이었던 것이다.
+  // 그러므로 while은 실행되고 parsed는 Or객체의 좌항이 되어 새로이 parsed에 Or이 대입된다.
+  // parseAssignment에선 재귀를 사용했은데 parseOr에서는 while을 사용하는 이유는 간단하다.
+  // assign은 우측결합 연산인 반면 or는 좌측결합 연산이기 때문이다. 
+  // 즉, 좌항이 먼저 평가되어야하는 연산이다. 바닥찍고 돌아오는 재귀와는 반대 순서의 구조를 생성해야하는 것이다.
+  // 참고로 좌측결합연산은 트리가 항상 좌측으로만 뻗어나간다. 우측결합연산은 그 반대이다.
+  // 오해하면 안된다. 대칭트리는 아니지만 단순히 불균형트리라고 말할 순 없다. 같은 부모 노드에서는 자식이 항상 좌우 대칭이다.
+  // 다만 그 자식 노드가 단방향으로 뻗어나간다는 말이다.
+  while (skipCurrentIf(Kind::LogicalOr)) {
+    auto tempOr = new Or();
+    tempOr->lhs = parsed;
+    // rhs가 parseAnd의 반환값인 이유는 Or전까지만 검증되어야 하기 때문이다. 
+    // Or토큰은 이미 while문에서 검사하고 있다. 즉, parseAnd함수를 실행하면 그 안에서 skipCurrent함수가 실행되어 Or연산자 직전까지 iterator가 전진할 것이다.
+    // 만약 식이 종료되었다면 while문도 종료되겠지만, Or 연산자가 더 존재했다면 while은 정확히 Or 연산자에서 멈춘 current를 참조하여 다시 parsed를 새로운 Or에 넣어 반환할 것이다.
+    tempOr->rhs = parseAnd();
+
+    parsed = tempOr;
   }
 
-  if (auto getElement = dynamic_cast<GetElement*>(result)) {
+  return parsed;
+}
+
+Expression* parseAssignment() {
+  auto parsed = parseOr();
+  // 대입 연산자는 이항연산자이므로 좌항과 우항이 필요하다
+  // parsed는 좌항이라기보다는 그냥 식을 파싱한 것인데,
+  // 파싱 이후 current가 =연산자라면 대입 연산인 것이므로 작업을 진행해야하고
+  // Assignment가 아니라면 그냥 식이 끝난 것이므로 반환한다는 의미이다.
+  // 참고로 식에서 대입이 일어난 다는 것은 a = b = 3; 에서 b = 3부분을 말하는 것이다.
+  // 또 하나 기억해야할 것은 대입연산은 역순으로 일어난 다는 것으로, 3이 b에 대입되고 b가 a에 대입되는 순서로 진행되어야 함을 뜻한다.
+  if (current->kind != Kind::Assignment) 
+    return parsed;
+  skipCurrent(Kind::Assignment);
+
+  // 아래의 두 if는 대입연산의 좌항이 될 수 있는 두가지 경우이다.
+  // 첫 번째는 변수명인 경우
+  // 두 번째는 객체의 요소일 경우(arr[1] = 'a';)이다.
+  if (auto getVariable = dynamic_cast<GetVariable*>(parsed)) {
+    auto varSetter = new SetVariable();
+
+    varSetter->name = getVariable->name;
+    // parseAssignment를 재귀적으로 실행하는 이유는 간단하다
+    // 식은 식을 포함할 수 있기 때문이다. 
+    // 그리고 식의 최하위 우선순위는 Assignment이므로 구문트리를 생성하기 위해 parseAssignment를 재귀 실행하면 된다.
+    // 더 정확히 말하면 assign 연산은 우측 결합 연산(우항이 먼저 계산되어야하는)이기 때문인데, 이는 위에서 설명한 a = b = 3; 예제와 같다.
+    // 재귀실행하면 재귀가 바닥을 찍고 올라오는 것이 우항의 최대깊이(a = b = c... z = 3; 에서 3)에서 부터 역순으로 돌아옴을 뜻하므로 조건에 정확히 부합하게 되는 것이다.
+    varSetter->value = parseAssignment();
+
+    return varSetter;  
+  }
+
+  if (auto getElement = dynamic_cast<GetElement*>(parsed)) {
     auto elemSetter = new SetElement();
+
     elemSetter->sub = getElement->sub;
     elemSetter->index = getElement->index;
+    // 왜 원소참조에서는 재귀실행하지 않는지에 대하여 대답하자면
+    // 구현상의 불편함때문이다. 더 정확히 말하자면 사실 재귀실행은 이곳에서 실행되어야 한다.
+    // 목표인 js클론에서 스코프를 정하지 않고 최상위에서 할당한 변수는 사실 global객체에 할당되고 있다. 암묵적으로 실행될 뿐이다.
+    // 그러므로 사실 모든 변수할당은 SetElement로 이루어져야한다. 최상단에선 굳이 main함수나 global을 표시하지 않더라도 자동으로 할당 및 실행되도록 말이다.
     elemSetter->value = getElement->value;
+
     return elemSetter;
   }
 
+  // 변수 참조 혹은 원소 참조가 아니라면 그냥 잘못된 식이 좌항에 온 것이므로 오류이다
   cout << "invalid assignment attempt detected";
   exit(1);
 }

@@ -9,6 +9,8 @@ using std::string;
 using std::vector;
 // https://stackoverflow.com/questions/22514855/arrow-operator-in-function-heading
 
+void interpret(Program*);
+
 vector<string> split(string input, char delimiter) {
     vector<string> answer;
     stringstream ss(input);
@@ -32,5 +34,6 @@ auto main()->void {
   Program* syntaxTree = parse(tokenList);
 
   pintSyntaxTree(syntaxTree);
+  interpret(syntaxTree);
 }
 
