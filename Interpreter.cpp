@@ -39,7 +39,11 @@ void Break::interpret() {};
 void Continue::interpret() {};
 void If::interpret() {};
 void Print::interpret() {
-  for (auto& node:arguments) {
+  // 주의할 것은, 사실 range-based for-loop에서는
+  // rvalue reference(ex: auto&&)가 더 일반적이라는 것이다
+  // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
+  // 물론 
+  for (const auto& node:arguments) {
     auto value = node->interpret();
     cout << value << " ";
     if (lineFeed) cout << endl;
