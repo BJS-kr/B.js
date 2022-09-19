@@ -222,7 +222,7 @@ struct NumberLiteral: Expression {
 };
 
 struct StringLiteral: Expression {
-  string string;
+  string value;
   any interpret();
 };
 

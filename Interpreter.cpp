@@ -1,5 +1,6 @@
 #pragma once
 #include "Node.h"
+#include "Datatype.h"
 #include <any>
 #include <map>
 #include <vector>
@@ -41,6 +42,7 @@ void Print::interpret() {
   for (auto& node:arguments) {
     auto value = node->interpret();
     cout << value << " ";
+    if (lineFeed) cout << endl;
   }
   cout << endl;
 };
@@ -62,7 +64,9 @@ any SetVariable::interpret() {};
 any NullLiteral::interpret() {};
 any BooleanLiteral::interpret() {};
 any NumberLiteral::interpret() {};
-any StringLiteral::interpret() {};
+any StringLiteral::interpret() {
+  return value;
+};
 any ArrayLiteral::interpret() {};
 any MapLiteral::interpret() {};
 
