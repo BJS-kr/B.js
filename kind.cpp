@@ -2,7 +2,8 @@
 #include <map>
 #include "./kind.h"
 
-using namespace std;
+using std::string;
+using std::map;
 
 static map<string, Kind> stringToKind = {
   {"#unknown",    Kind::Unknown},
@@ -19,8 +20,8 @@ static map<string, Kind> stringToKind = {
   {"return",      Kind::Return},
 
   {"var",         Kind::Variable},
-  {"let"          Kind::Let}
-  {"const"        Kind::Constant},
+  {"let",         Kind::Let},
+  {"const",       Kind::Constant},
 
   {"for",         Kind::For},
   {"break",       Kind::Break},

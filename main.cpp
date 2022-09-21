@@ -7,6 +7,7 @@
 
 using std::string;
 using std::vector;
+using std::stringstream;
 // https://stackoverflow.com/questions/22514855/arrow-operator-in-function-heading
 
 void interpret(Program*);
@@ -23,17 +24,19 @@ vector<string> split(string input, char delimiter) {
     return answer;
 }
 
-auto main()->void {
+int main() {
   string sourceCode = R""""(
     function main() {
-      console.log('hello world!')
+      print 'hello world!'
     }
   )"""";
 
-  vector<Token>  tokenList = scan(sourceCode);
+  vector<Token> tokenList = scan(sourceCode);
   Program* syntaxTree = parse(tokenList);
 
-  pintSyntaxTree(syntaxTree);
+  printSyntaxTree(syntaxTree);
   interpret(syntaxTree);
+  
+  return 1;
 }
 

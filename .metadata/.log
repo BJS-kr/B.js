@@ -1,0 +1,53 @@
+!SESSION 2022-09-18 06:45:38.961 -----------------------------------------------
+eclipse.buildId=4.25.0.I20220831-1800
+java.version=17.0.4.1
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=macosx, ARCH=x86_64, WS=cocoa, NL=ko_KR
+Framework arguments:  -product org.eclipse.epp.package.cpp.product -keyring /Users/bjs/.eclipse_keyring
+Command-line arguments:  -os macosx -ws cocoa -arch x86_64 -product org.eclipse.epp.package.cpp.product -keyring /Users/bjs/.eclipse_keyring
+
+!ENTRY org.eclipse.core.resources 4 77 2022-09-18 06:48:33.304
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2022-09-18 06:48:33.304
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2022-09-18 06:48:33.304
+!MESSAGE /Users/bjs/Desktop/B.js overlaps the workspace location: /Users/bjs/Desktop/B.js
+
+!ENTRY org.eclipse.ui.ide 4 0 2022-09-18 06:49:12.010
+!MESSAGE Could not import project located at /Users/bjs/Desktop/B.js
+!STACK 0
+org.eclipse.ui.internal.wizards.datatransfer.CouldNotImportProjectException: Could not import project located at /Users/bjs/Desktop/B.js
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.toExistingOrNewProject(SmartImportJob.java:565)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.run(SmartImportJob.java:252)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: org.eclipse.core.internal.resources.ResourceException: Invalid project description.
+	at org.eclipse.core.internal.resources.Project.checkDescription(Project.java:178)
+	at org.eclipse.core.internal.resources.Project.assertCreateRequirements(Project.java:62)
+	at org.eclipse.core.internal.resources.Project.create(Project.java:272)
+	at org.eclipse.core.internal.resources.Project.create(Project.java:258)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.createOrImportProject(SmartImportJob.java:604)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.toExistingOrNewProject(SmartImportJob.java:552)
+	... 2 more
+
+!ENTRY org.eclipse.core.resources 4 77 2022-09-18 06:50:08.025
+!MESSAGE Invalid project description.
+!SUBENTRY 1 unknown 0 0 2022-09-18 06:50:08.025
+!MESSAGE OK
+!SUBENTRY 1 org.eclipse.core.resources 4 77 2022-09-18 06:50:08.025
+!MESSAGE /Users/bjs/Desktop/B.js overlaps the workspace location: /Users/bjs/Desktop/B.js
+
+!ENTRY org.eclipse.ui.ide 4 0 2022-09-18 06:50:23.240
+!MESSAGE Could not import project located at /Users/bjs/Desktop/B.js
+!STACK 0
+org.eclipse.ui.internal.wizards.datatransfer.CouldNotImportProjectException: Could not import project located at /Users/bjs/Desktop/B.js
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.toExistingOrNewProject(SmartImportJob.java:565)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.run(SmartImportJob.java:252)
+	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:63)
+Caused by: org.eclipse.core.internal.resources.ResourceException: Invalid project description.
+	at org.eclipse.core.internal.resources.Project.checkDescription(Project.java:178)
+	at org.eclipse.core.internal.resources.Project.assertCreateRequirements(Project.java:62)
+	at org.eclipse.core.internal.resources.Project.create(Project.java:272)
+	at org.eclipse.core.internal.resources.Project.create(Project.java:258)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.createOrImportProject(SmartImportJob.java:604)
+	at org.eclipse.ui.internal.wizards.datatransfer.SmartImportJob.toExistingOrNewProject(SmartImportJob.java:552)
+	... 2 more
