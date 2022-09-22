@@ -14,17 +14,17 @@ using std::endl;
 static vector<Token>::iterator current;
 
 // auto는 자명한 타입추론 뿐 아니라 함수 줄 맞춤에도 큰 효과가 있는 것 같다. 엄청 깔끔해보인다 :)
-auto skipCurrent(Kind)->void;
-auto skipCurrentIf(Kind)->bool;
-auto parseAssignment()->Expression*;
-auto parseOr()->Expression*;
-auto parseAnd()->Expression*;
-auto parseExpression()->Expression*;
-auto parseExpressionStatement()->ExpressionStatement*;
-auto parseVariable()->Variable*;
-auto parseParameters()->vector<string>;
-auto parseBlock()->vector<Statement*>;
-auto parseFunction()->Function*;
+static auto skipCurrent(Kind)->void;
+static auto skipCurrentIf(Kind)->bool;
+static auto parseAssignment()->Expression*;
+static auto parseOr()->Expression*;
+static auto parseAnd()->Expression*;
+static auto parseExpression()->Expression*;
+static auto parseExpressionStatement()->ExpressionStatement*;
+static auto parseVariable()->Variable*;
+static auto parseParameters()->vector<string>;
+static auto parseBlock()->vector<Statement*>;
+static auto parseFunction()->Function*;
 
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
@@ -122,6 +122,15 @@ vector<Statement*> parseBlock() {
       // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
       case Kind::Variable:
         block.push_back(parseVariable());
+        break;
+      case Kind::Print:
+        skipCurrent(Kind::Print);
+        auto print = new Print();
+        auto stringLiteral = new StringLiteral();
+        stringLiteral->value = current->code;
+        print->lineFeed = false;
+        print->arguments = { stringLiteral };
+        block.push_back(print);
         break;
       case Kind::EndOfToken:
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";

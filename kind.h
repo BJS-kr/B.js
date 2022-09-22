@@ -1,3 +1,5 @@
+#pragma once
+#include<string>
 // https://stackoverflow.com/questions/18335861/why-is-enum-class-preferred-over-plain-enum
 // enum class를 enum보다 prefer하는 이유는 type safety때문이다.
 enum class Kind {
@@ -27,4 +29,4 @@ enum class Kind {
   LeftBracket, RightBracket
 };
 
-Kind toKind(string);
+Kind toKind(std::string);

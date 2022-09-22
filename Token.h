@@ -1,4 +1,5 @@
-#include "./kind.h"
+#pragma once
+#include "Kind.h"
 #include <string>
 
 using std::string;
@@ -8,6 +9,6 @@ Kind toKind(string);
 
 struct Token {
   // unknown by default
-  Kind kind = Kind::Unknown;
+  Kind kind;
   string code;
 };

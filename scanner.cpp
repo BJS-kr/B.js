@@ -11,15 +11,14 @@ using std::endl;
 
 static string::iterator current;
 
-auto scan(string)->vector<Token>;
-auto getCharType(const char)->CharType;
-auto isCharType(const char, CharType)->bool;
-auto scanNumberLiteral()->Token;
-auto scanStringLiteral()->Token;
-auto scanIdentifierAndKeyword()->Token;
-auto scanOperatorAndPunctuator()->Token;
+static auto getCharType(const char)->CharType;
+static auto isCharType(const char, CharType)->bool;
+static auto scanNumberLiteral()->Token;
+static auto scanStringLiteral()->Token;
+static auto scanIdentifierAndKeyword()->Token;
+static auto scanOperatorAndPunctuator()->Token;
 
-vector<Token> scan(string sourceCode) {
+auto scan(string sourceCode)->vector<Token> {
   vector<Token> scanned;
   sourceCode += '\0'; // null 문자. null에 도달하면 정지하기 위함
   current = sourceCode.begin();

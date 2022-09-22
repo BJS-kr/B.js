@@ -2,6 +2,6 @@
 #include "Node.h"
 #include "Token.h"
 
-vector<Token> scan(string);
-Program* parse(vector<Token>);
-void printSyntaxTree(Program*);
+auto scan(string)->vector<Token>;
+auto parse(vector<Token>)->Program*;
+auto interpret(Program*)->void;

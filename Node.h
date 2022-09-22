@@ -1,9 +1,10 @@
+#pragma once
 #include<vector>
 #include<string>
 #include<string>
 #include<map>
 #include<any>
-#include"./Kind.h"
+#include"Kind.h"
 
 using std::vector;
 using std::string;
@@ -15,9 +16,7 @@ using std::any;
  * 그러나 단일문이라고 해도 expression은 포함할 수 있다. 예를 들어 return 문에 식을 넣을 수 있는 것처럼 말이다.
  * 결론적으로 statement는 statement과 expression을 포함할 수 있다.
  */
-struct Program {
-  vector<Function*> functions;
-};
+
 
 // 문
 struct Statement {
@@ -37,6 +36,10 @@ struct Function: Statement {
   vector<Statement*> block;
   
   void interpret();
+};
+
+struct Program {
+  vector<Function*> functions;
 };
 
 // Return은 단일문이다. 그러므로 Statement를 상속받는다.
@@ -88,7 +91,7 @@ struct If: Statement {
 // print
 struct Print: Statement {
   // 개행 여부를 표현한다. 기본값 false이다
-  bool lineFeed = false;
+  bool lineFeed;
   // 출력할 식 리스트
   vector<Expression*> arguments;
   void interpret();
@@ -212,12 +215,12 @@ struct NullLiteral: Expression {
 // 참고로 C++의 primitive types들은 initial value가 없다. 아래의 노드들은 그러한 차이를 단적으로 보여주고 있는데,
 // bool과 double은 멤버를 명시적으로 초기화하는 반면, string은 초기값이 존재하기 때문에 초기화식이 없이 선언과 동시에 초기화가 이루어진다.
 struct BooleanLiteral: Expression {
-  bool value = false;
+  bool value;
   any interpret();
 };
 
 struct NumberLiteral: Expression {
-  double value = 0.0;
+  double value;
   any interpret();
 };
 
