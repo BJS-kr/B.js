@@ -15,17 +15,17 @@ enum class Kind {
   Variable, Constant, Let,
   For, Break, Continue,
   If, Elif, Else,
-  Print, PrintLine,
+  Console,
 
   LogicalAnd, LogicalOr,
   Assignment,
   Add, Subtract,
   Multiply, Divide, Modulo,
-  Equal, NotEqual,
+  StrictEqual, StrictNotEqual, Equal, NotEqual,
   LessThan, GreaterThan,
   LessOrEqual, GreaterOrEqual,
 
-  Comma, Colon, Semicolon,
+  Dot, Comma, Colon, Semicolon,
   LeftParen, RightParen,
   LeftBrace, RightBrace,
   LeftBracket, RightBracket

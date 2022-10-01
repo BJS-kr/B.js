@@ -41,17 +41,19 @@ void For::interpret() {};
 void Break::interpret() {};
 void Continue::interpret() {};
 void If::interpret() {};
-void Print::interpret() {
+void Console::interpret() {
   // 주의할 것은, 사실 range-based for-loop에서는
   // rvalue reference(ex: auto&&)가 더 일반적이라는 것이다
   // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
   // 물론 &&는 일반적으로 r l value를 모두 참조할 수 있어서 좋다는 거고 아래처럼 lvalue가 확실할 때는 그냥 &로 적어도된다. 
-  for (const auto& node:arguments) {
+  if (consoleMethod == "log") {
+    for (const auto& node:arguments) {
     auto value = node->interpret();
     cout << value << " ";
-    if (lineFeed) cout << endl;
+   }
+    cout << endl;
   }
-  cout << endl;
+
 };
 void ExpressionStatement::interpret() {};
 

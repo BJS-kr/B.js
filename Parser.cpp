@@ -33,7 +33,7 @@ static auto parseFunction()->Function*;
 // 결론적으로 iterator를 전진시킴과 동시에 올바른 구현인지를 검증하는 함수다.
 void skipCurrent(Kind kind) {
   if (current->kind != kind) {
-    cout << toString(kind) << " Token kind not matches"; 
+    cout << "current: " << current->code << " " << "kind: " << toString(kind) << " Token kind not matches"; 
     exit(1);
   }
   ++current;
@@ -118,22 +118,30 @@ vector<Statement*> parseBlock() {
   while (current->kind != Kind::RightBrace) {
     // 함수 블록안에 존재해서는 안되는 토큰들 검증
     switch (current->kind) {
+      case Kind::Function:
+        block.push_back(parseFunction());
+        break;
       // 일단은 var 키워드로 변수를 선언하는 처리만 되어있다.
       // 향후 let과 const도 처리하려면 이곳에서 처리를 추가하면 된다.
       // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
       case Kind::Variable:
         block.push_back(parseVariable());
         break;
-      case Kind::Print: {
-        skipCurrent(Kind::Print);
-        auto print = new Print();
+      case Kind::Console: {
+        auto console = new Console();
         auto stringLiteral = new StringLiteral();
-        
+
+        skipCurrent(Kind::Console);
+        skipCurrent(Kind::Dot);
+        console->consoleMethod = current->code;
+        skipCurrent(Kind::Identifier); // console method
+
+        skipCurrent(Kind::LeftParen);
         stringLiteral->value = current->code;
-        print->lineFeed = false;
-        print->arguments = { stringLiteral };
-        block.push_back(print);
+        console->arguments = { stringLiteral };
+        block.push_back(console);
         skipCurrent(Kind::StringLiteral);
+        skipCurrent(Kind::RightParen);
         break;
       }
         

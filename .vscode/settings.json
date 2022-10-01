@@ -47,6 +47,7 @@
     "xtr1common": "cpp",
     "xtree": "cpp",
     "xutility": "cpp",
-    "any": "cpp"
+    "any": "cpp",
+    "__node_handle": "cpp"
   }
 }

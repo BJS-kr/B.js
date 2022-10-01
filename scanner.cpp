@@ -79,6 +79,9 @@ CharType getCharType(const char c) {
 bool isCharType(const char c, CharType type) {
   switch (type) {
     case CharType::IdentifierAndKeyword:
+    // 0,9범위를 identifierAndKeyword로 판단하는 이유:
+    // 애초에 case가 식별자와 키워드이므로, 첫 글자가 숫자가 아니라는 것은 검증된 것이다(getCharType함수에서는 숫자를 식별자와 키워드 범위에 넣고 있지 않음을 주목하자).
+    // 숫자는 식별자의 시작문자는 될 순 없지만 후행할 순 있으므로, 숫자를 포함하는 것이다자
       return c >= '0' && c <= '9' ||
              c >= 'a' && c <= 'z' ||
              c >= 'A' && c <= 'Z';
@@ -116,11 +119,12 @@ Token scanNumberLiteral() {
 
 Token scanStringLiteral() {
   string string_literal;
-  // 첫 글자는 따옴표이므로 건너뛰기 위해 1 증가
+  // 첫 글자는 따옴표이므로 건너뛰기 위해 1 전진
   ++current;
   while (isCharType(*current, CharType::StringLiteral)) {
     string_literal += *current++;
   }
+  // 모든 글자를 읽은 후 현재 위치는 닫는 따옴표이므로 1 전진
   ++current;
   return Token{Kind::StringLiteral, string_literal};
 };
@@ -135,6 +139,7 @@ Token scanIdentifierAndKeyword() {
   // 그러므로 toKind가 Unknown반환시 Identifier로 Token을 생성하고,
   // 아니라면 그에 맞는 kind를 넣는다.
   Kind kind = toKind(identifier_keyword);
+  // 키워드가 아니면 식별자라는 뜻이므로 toKind가 Unknown을 반환하면 식별자. 아니면 키워드
   return Token{kind == Kind::Unknown ? Kind::Identifier : kind, identifier_keyword};
 };
 

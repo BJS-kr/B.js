@@ -88,10 +88,10 @@ struct If: Statement {
   void interpret();
 };
 
-// print
-struct Print: Statement {
+// console
+struct Console: Statement {
   // 개행 여부를 표현한다. 기본값 false이다
-  bool lineFeed;
+  string consoleMethod;
   // 출력할 식 리스트
   vector<Expression*> arguments;
   void interpret();

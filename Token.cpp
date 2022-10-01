@@ -29,11 +29,10 @@ static map<string, Kind> stringToKind = {
   {"if",          Kind::If},
   {"elif",        Kind::Elif},
   {"else",        Kind::Else},
-  {"print",       Kind::Print},
-  {"printLine",   Kind::PrintLine},
+  {"console",     Kind::Console},
 
-  {"and",         Kind::LogicalAnd},
-  {"or",          Kind::LogicalOr},
+  {"&&",          Kind::LogicalAnd},
+  {"||",          Kind::LogicalOr},
 
   {"=",           Kind::Assignment},
 
@@ -43,6 +42,8 @@ static map<string, Kind> stringToKind = {
   {"/",           Kind::Divide},
   {"%",           Kind::Modulo},
 
+  {"===",         Kind::StrictEqual},
+  {"!==",         Kind::StrictNotEqual},
   {"==",          Kind::Equal},
   {"!=",          Kind::NotEqual},
   {"<",           Kind::LessThan},
@@ -50,6 +51,7 @@ static map<string, Kind> stringToKind = {
   {"<=",          Kind::LessOrEqual},
   {">=",          Kind::GreaterOrEqual},
 
+  {".",           Kind::Dot},
   {",",           Kind::Comma},
   {":",           Kind::Colon},
   {";",           Kind::Semicolon},
@@ -61,6 +63,7 @@ static map<string, Kind> stringToKind = {
   {"]",           Kind::RightBracket},
 };
 
+// IIFE로 위의 맵을 뒤집은 값을 할당
 static auto kindToString = [] {
   map<Kind, string> result;
   for (auto& [key, value] : stringToKind)
