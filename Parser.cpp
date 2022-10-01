@@ -59,6 +59,7 @@ Program* parse(vector<Token> tokens) {
         program->functions.push_back(parseFunction());
         break;
       default:
+        cout << current->code << " " << toString(current->kind) << endl;
         cout << "Cannot parse syntax tree: invalid kind of Token detected" << endl;
         exit(1);
     }    

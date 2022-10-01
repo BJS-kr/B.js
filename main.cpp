@@ -8,10 +8,11 @@ auto main()->int {
   // 이 방법이 합리적인 이유는 하나 더 있는데, main을 다시 작성하더라도 상관이 없다는 것이다.
   // 현재 인터프리터는 파싱된 함수를 루프하며 function table에 매핑하는데, main이 중복되어 지정되면 나중에 정의된, 그러니까 내부의 함수가 외부 함수를 대체한다.
   // 그러므로 main을 엔트리포인트로 사용하기만 했다면 명시했던 명시하지 않았던 같은 동작이 이루어지는 것이다.
-  string sourceCode = mainify(R""""(
-      console.log('Hello, World!');
-      console.error('print error');
-  )"""");
+  ifstream sourceStream("./source.bjs");
+  stringstream sourceBuffer;
+  sourceBuffer << sourceStream.rdbuf();
+
+  string sourceCode = mainify(sourceBuffer.str());
 
   auto tokenList = scan(sourceCode);
   auto syntaxTree = parse(tokenList);
