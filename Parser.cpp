@@ -2,6 +2,7 @@
 #include <iostream>
 #include "Token.h"
 #include "Node.h"
+#include "Datatype.h"
 
 using std::vector;
 using std::cout;
@@ -123,18 +124,24 @@ vector<Statement*> parseBlock() {
       case Kind::Variable:
         block.push_back(parseVariable());
         break;
-      case Kind::Print:
+      case Kind::Print: {
         skipCurrent(Kind::Print);
         auto print = new Print();
         auto stringLiteral = new StringLiteral();
+        
         stringLiteral->value = current->code;
         print->lineFeed = false;
         print->arguments = { stringLiteral };
         block.push_back(print);
+        skipCurrent(Kind::StringLiteral);
         break;
-      case Kind::EndOfToken:
+      }
+        
+      case Kind::EndOfToken: {
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
         exit(1);
+      }
+
       default:
         block.push_back(parseExpressionStatement());
     }
@@ -256,7 +263,7 @@ Expression* parseOr() {
 }
 
 Expression* parseAnd() {
-  return;
+  return {};
 }
 
 

@@ -47,6 +47,7 @@ auto scan(string sourceCode)->vector<Token> {
         exit(1);
     }
   }
+  
   const Token ender = { Kind::EndOfToken };
   // 마지막엔 Token의 string값을 비운채로 토큰만 푸쉬
   scanned.push_back(ender);
@@ -117,9 +118,10 @@ Token scanStringLiteral() {
   string string_literal;
   // 첫 글자는 따옴표이므로 건너뛰기 위해 1 증가
   ++current;
-  while (isCharType(*current, CharType::StringLiteral))  
+  while (isCharType(*current, CharType::StringLiteral)) {
     string_literal += *current++;
-  
+  }
+  ++current;
   return Token{Kind::StringLiteral, string_literal};
 };
 

@@ -1,6 +1,6 @@
 #include <string>
 #include <map>
-#include "./kind.h"
+#include "Token.h"
 
 using std::string;
 using std::map;
@@ -61,9 +61,23 @@ static map<string, Kind> stringToKind = {
   {"]",           Kind::RightBracket},
 };
 
+static auto kindToString = [] {
+  map<Kind, string> result;
+  for (auto& [key, value] : stringToKind)
+    result[value] = key;
+  return result;
+}();
+
+
 Kind toKind(string string) {
   // count는 존재하는지를 검증. at은 key에 대응되는 value가져오기
   if (stringToKind.count(string)) return stringToKind.at(string);
   // Unknown by default
   return Kind::Unknown;
+}
+
+auto toString(Kind type)->string {
+  if (kindToString.count(type))
+    return kindToString.at(type);
+  return "";
 }

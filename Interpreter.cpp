@@ -1,4 +1,3 @@
-#pragma once
 #include "Node.h"
 #include "Datatype.h"
 #include <any>
@@ -59,22 +58,22 @@ void ExpressionStatement::interpret() {};
 /**
  * @brief Expression Interpreters 
  */
-any Or::interpret() {};
-any And::interpret() {};
-any Relational::interpret() {};
-any Arithmetic::interpret() {};
-any Unary::interpret() {};
-any Call::interpret() {};
-any GetElement::interpret() {};
-any SetElement::interpret() {};
-any GetVariable::interpret() {};
-any SetVariable::interpret() {};
-any NullLiteral::interpret() {};
-any BooleanLiteral::interpret() {};
-any NumberLiteral::interpret() {};
+any Or::interpret() {return 1;};
+any And::interpret() {return 1;};
+any Relational::interpret() {return 1;};
+any Arithmetic::interpret() {return 1;};
+any Unary::interpret() {return 1;};
+any Call::interpret() {return 1;};
+any GetElement::interpret() {return 1;};
+any SetElement::interpret() {return 1;};
+any GetVariable::interpret() {return 1;};
+any SetVariable::interpret() {return 1;};
+any NullLiteral::interpret() {return 1;};
+any BooleanLiteral::interpret() {return 1;};
+any NumberLiteral::interpret() {return 1;}
 any StringLiteral::interpret() {
   return value;
 };
-any ArrayLiteral::interpret() {};
-any MapLiteral::interpret() {};
+any ArrayLiteral::interpret() {return 1;};
+any MapLiteral::interpret() {return 1;};
 
