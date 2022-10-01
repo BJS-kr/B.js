@@ -90,6 +90,7 @@ struct If: Statement {
 
 // console
 struct Console: Statement {
+  void sequencePrint();
   // 개행 여부를 표현한다. 기본값 false이다
   string consoleMethod;
   // 출력할 식 리스트

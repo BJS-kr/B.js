@@ -10,6 +10,7 @@ auto main()->int {
   // 그러므로 main을 엔트리포인트로 사용하기만 했다면 명시했던 명시하지 않았던 같은 동작이 이루어지는 것이다.
   string sourceCode = mainify(R""""(
       console.log('Hello, World!');
+      console.error('print error');
   )"""");
 
   auto tokenList = scan(sourceCode);

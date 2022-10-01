@@ -113,8 +113,6 @@ vector<string> parseParameters() {
 
 vector<Statement*> parseBlock() {
   vector<Statement*> block;
-  // 함수 안에는 또 다른 block이 있을 수도 있는데 RightBrace로 종료를 검증하면 너무 안일한 것 아닌가?
-  // 라고 생각했는데 생각해보니 재귀적으로 parseBlock을 실행하면 될일 이었다.
   while (current->kind != Kind::RightBrace) {
     // 함수 블록안에 존재해서는 안되는 토큰들 검증
     switch (current->kind) {
@@ -142,6 +140,7 @@ vector<Statement*> parseBlock() {
         block.push_back(console);
         skipCurrent(Kind::StringLiteral);
         skipCurrent(Kind::RightParen);
+        skipCurrent(Kind::Semicolon);
         break;
       }
         

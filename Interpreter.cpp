@@ -1,5 +1,6 @@
 #include "Node.h"
 #include "Datatype.h"
+#include "Color.h"
 #include <any>
 #include <map>
 #include <vector>
@@ -14,6 +15,8 @@ using std::cout;
 using std::endl;
 
 static map<string, Function*> functionTable;
+static Color::Modifier red(Color::FG_RED);
+static Color::Modifier def(Color::FG_DEFAULT);
 
 void interpret(Program* program) {
   // 아래의 for문은 단지 program에 등록된 함수들을 모두 functionTable에 등록시키는 것이다.
@@ -41,17 +44,25 @@ void For::interpret() {};
 void Break::interpret() {};
 void Continue::interpret() {};
 void If::interpret() {};
+void Console::sequencePrint() {
+    for (const auto& node:arguments) {
+    auto value = node->interpret();
+    cout << value << " ";
+   }
+    cout << endl;
+}
 void Console::interpret() {
   // 주의할 것은, 사실 range-based for-loop에서는
   // rvalue reference(ex: auto&&)가 더 일반적이라는 것이다
   // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
   // 물론 &&는 일반적으로 r l value를 모두 참조할 수 있어서 좋다는 거고 아래처럼 lvalue가 확실할 때는 그냥 &로 적어도된다. 
   if (consoleMethod == "log") {
-    for (const auto& node:arguments) {
-    auto value = node->interpret();
-    cout << value << " ";
-   }
-    cout << endl;
+    cout << def;
+    sequencePrint();
+  }
+  else if (consoleMethod == "error") {
+    cout << red;
+    sequencePrint();
   }
 
 };
