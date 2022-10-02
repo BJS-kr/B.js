@@ -51,6 +51,8 @@ struct Return: Statement {
 
 // 변수의 선언
 struct Variable: Statement {
+  Variable(string declareType):declareType(declareType) {}
+  string declareType;
   // 변수 이름
   string name;
   // 변수 선언엔 식을 넣을 수 있다
@@ -235,7 +237,7 @@ struct ArrayLiteral: Expression {
   any interpret();
 };
 
-struct MapLiteral: Expression {
+struct ObjectLiteral: Expression {
   map<string, Expression*> values;
   any interpret();
 };

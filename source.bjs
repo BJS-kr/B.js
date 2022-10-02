@@ -1,2 +1,6 @@
 console.log('Hello, World!');
-console.error('print error');
+console.error('critical error detected!');
+
+const height = 181;
+const name = 'BJS';
+let age = 32;

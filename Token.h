@@ -18,7 +18,9 @@ enum class Kind {
   Console,
 
   LogicalAnd, LogicalOr,
-  Assignment,
+
+  Assignment, AddAssignment, SubtractAssignment,
+
   Add, Subtract,
   Multiply, Divide, Modulo,
   StrictEqual, StrictNotEqual, Equal, NotEqual,

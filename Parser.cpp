@@ -1,5 +1,6 @@
 #include <vector>
 #include <iostream>
+#include <string>
 #include "Token.h"
 #include "Node.h"
 #include "Datatype.h"
@@ -7,6 +8,7 @@
 using std::vector;
 using std::cout;
 using std::endl;
+using std::stod;
 // Scanner.cpp의 scan함수는 Token list를 반환한다.
 // parse함수는 그렇게 생성된 Token list를 EndOfToken을 마주칠 때 까지 순회한다.
 // parse함수의 반환 값은 구문 트리의 루트 노드이다. 구문 트리는 프로그램을 실행할 순서가 표현되어 있다.
@@ -20,12 +22,21 @@ static auto skipCurrentIf(Kind)->bool;
 static auto parseAssignment()->Expression*;
 static auto parseOr()->Expression*;
 static auto parseAnd()->Expression*;
+static auto parseRelational()->Expression*;
+static auto parseAddOrSubtract()->Expression*;
+static auto parseMultiplicationOrDivide()->Expression*;
+static auto parseElementAccessOrFunctionCall()->Expression*;
+static auto parseVariableOrLiterals()->Expression*;
+static auto parseArrayLiteralOrObjectLiteral()->Expression*;
 static auto parseExpression()->Expression*;
 static auto parseExpressionStatement()->ExpressionStatement*;
-static auto parseVariable()->Variable*;
+static auto parseVar()->Variable*;
+static auto parseConst()->Variable*;
+static auto parseLet()->Variable*;
 static auto parseParameters()->vector<string>;
 static auto parseBlock()->vector<Statement*>;
 static auto parseFunction()->Function*;
+static auto getVariableNameAndParseExpression(Variable*)->void;
 
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
@@ -124,7 +135,11 @@ vector<Statement*> parseBlock() {
       // 향후 let과 const도 처리하려면 이곳에서 처리를 추가하면 된다.
       // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
       case Kind::Variable:
-        block.push_back(parseVariable());
+        block.push_back(parseVar());
+        break;
+      case Kind::Constant:
+        break;
+      case Kind::Let:
         break;
       case Kind::Console: {
         auto console = new Console();
@@ -157,26 +172,43 @@ vector<Statement*> parseBlock() {
   return block;
 }
 
-// "var" 문자열을 발견하여 변수 선언임을 확인하고 변수 node를 만들기 위한 함수
-// function과 마찬가지로 var도 처리가 필요하지 않은 키워드이므로 current iterator를 전진시키고, 대신 Variable node를 생성한다.
-Variable* parseVariable() {
-  auto variable = new Variable();
-  skipCurrent(Kind::Variable);
 
+auto getVariableNameAndParseExpression(Variable* variable)->void {
   variable->name = current->code;
   skipCurrent(Kind::Identifier);
-  skipCurrent(Kind::Assignment); // 할당연산자 = 를 말한다. 설명이 없어도 생략이 가능함을 알 것이다.
+  skipCurrent(Kind::Assignment);// 상술한대로 토큰 자체는 생략된다.
   // 사실 이는 var과 let에 한해서 js스펙에 걸맞지 않은데, const는 항상 즉시 초기화가 필요한 반면 var과 let은 초기화를 미룰 수 있기 때문이다.
   // 그러므로 Assignment를 즉시 검증하는 것은 올바르지 않고, const의 경우에만 위의 구현이 올바르다.
   // var이나 let이라면 즉시 초기화하는 경우와 미루는 경우를 둘다 판단해야하고, 미뤘다고 판단하면 expression은 undefined를 할당해야하는데 그냥 null로 퉁치겠다.
-  
   variable->expression = parseExpression();
-  skipCurrent(Kind::Semicolon); // 이것도 js스펙과는 맞지 않는다. js는 semicolon없이도 구문 트리를 생성할 수 있기 때문이다. 
+  skipCurrent(Kind::Semicolon);// 이것도 js스펙과는 맞지 않는다. js는 semicolon없이도 구문 트리를 생성할 수 있기 때문이다. 
   // 다만 세미콜론 없이도 줄바꿈으로 초기화 종료를 판단하는 것은 간단한데, 둘다 검증하면 되기 때문이다. 
   // 그렇게 하려면 skipCurrent 함수의 인자는 vector<Kind>가 되어 여러 요소를 순회하며 검증하는 식이 되어야 할것이다. 템플릿 특수화를 하던가..
   // 일단은 간단한 구현으로 완성하는게 먼저이니 굳이 구현하지 않겠다. 
+}
 
-  return variable;
+Variable* parseVar() {
+  auto var = new Variable("var");
+  skipCurrent(Kind::Variable);
+  getVariableNameAndParseExpression(var);
+
+  return var;
+}
+
+Variable* parseConst() {
+  auto constant = new Variable("const");
+  skipCurrent(Kind::Constant);
+  getVariableNameAndParseExpression(constant);
+
+  return constant;
+}
+
+Variable* parseLet() {
+  auto let = new Variable("let");
+  skipCurrent(Kind::Let);
+  getVariableNameAndParseExpression(let);
+
+  return let;
 }
 
 // 구문 분석의 다른 부분들에서 토큰의 종류에 따라 분석하던 것과는 달리,
@@ -212,7 +244,7 @@ Expression* parseExpression() {
 // 모든 식이 소비되는 것은 아니다.
 // 함수 본문에서 소비되지 않는 식을 발견하면 그 식은 소비되기 위하여 임의로 문에 감싸져야하므로
 // 소비되지 않는, 그러니까 문에 포함되지 않는 식을 발견했을때 문으로 감싸기 위한 함수라는 것이다.
-// 문으로 감싸야 하는 이유는 프로그램이 '구문'을 소비하기 때문이다. Statement타입이 아니면 소비할 수 없다는 것이다.
+// 문으로 감싸야 하는 이유는 프로그램이 '구문'을 소비하기 때문이다. Statement타입이 아니면 소비할 수 없다.
 ExpressionStatement* parseExpressionStatement() {
   auto expressionStatement = new ExpressionStatement();
   expressionStatement->expression = parseExpression();
@@ -223,57 +255,148 @@ ExpressionStatement* parseExpressionStatement() {
 }
 
 Expression* parseAssignment() {
-  auto result = parseOr();
-  // Or과 다르게 if로 검증하는 이유는 자명하다. 하단의 두개의 if문에서 재귀호출하여 parseAssignment하고 있기 때문이다.
-  // 그 이유는 Assignment가 우결합연산이기 때문이다. 
+  // 변수이름을 단순히 parsed로 정한 이유는 반환받은 객체가 정확히 어떤 객체인지 알 수 없기 때문이다.
+  // 동작이 혼동될 수 있는데, 할당이 우결합 연산이라고 해서 아래의 parseOr가 우항부터 트리를 만든다는 것이 아니다.
+  // 좌항으로부터 전진한 것이며, 만약 정말로 할당 연산이었다면 parseOr가 반환된 시점에 parsed는 무조건 변수 참조이거나 원소참조이다(아니라면 오류이다).
+  // 참고로 좌항이 var a, const b, let c 따위일 수는 없는데, parseBlock에서 이미 iterator를 전진시켰을 것이기 때문이다.
+  // 만약 이해가 가지 않는다면 parseAssignment는 단지 parseExpression을 위해 존재하며, 연산자 우선순위가 최상단이기 때문에 parseExpression == parseAssignment인 것이고
+  // 의미 전달을 위해 parseExpression으로 이름만 가지고 있다는 것을 기억하면 된다.
+  auto parsed = parseOr(); 
+  // Or과 다르게 if로 검증하는 이유는 Assignment가 우결합연산이기 때문이다. 
   // a = b = 3 이라는 식을 떠올려보자. a와 b는 모두 3이 되어야 하고, 그러려면 b = 3이 먼저 평가된 후 a = b가 평가되어야 한다.
   // 그렇다면 조금 더 길게 a = b = ... z = 3이라고 생각해보자. 결국 평가되어야 하는 것은 3이다.
-  // a = b를 평가하던 도중 assignment연산이 더 존재한다면 b = c를 평가하고 그 와중에 c = d를 평가다야하고.. 결국 바닥인 3을 찍고 돌아와야한다는 것이다.
-  // 이런 식으로 조건에 따라 바닥부터 평가가 되돌아오게 하기 위하여 재귀호출하여 처리한다. 
+  // a = b를 평가하던 도중 assignment연산이 더 존재한다면 b = c를 평가하고 그 와중에 c = d를 평가되어야하고.. 결국 바닥인 3을 찍고 돌아와야한다는 것이다.
+  // 이런 식으로 조건에 따라 바닥부터 평가가 되돌아오게 하기 위하여 재귀호출하여 처리한다.
   if (current->kind != Kind::Assignment) 
-    return result;
+    return parsed; // 할당연산이 아니었으므로 parsed가 무엇이던 간에 그냥 반환하면 된다.
   skipCurrent(Kind::Assignment);
 
-  if (auto getVariable = dynamic_cast<GetVariable*>(result)) {
-    auto varSetter = new SetVariable();
-    varSetter->name = getVariable->name;
-    varSetter->value = parseAssignment();
-    return varSetter;
+  if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
+    auto variable_setter = new SetVariable();
+    variable_setter->name = get_variable->name;
+    variable_setter->value = parseAssignment();
+    return variable_setter;
   }
 
-  if (auto getElement = dynamic_cast<GetElement*>(result)) {
-    auto elemSetter = new SetElement();
-    elemSetter->sub = getElement->sub;
-    elemSetter->index = getElement->index;
-    elemSetter->value = parseAssignment();
-    return elemSetter;
+  if (auto get_element = dynamic_cast<GetElement*>(parsed)) {
+    auto element_setter = new SetElement();
+    element_setter->sub = get_element->sub;
+    element_setter->index = get_element->index;
+    element_setter->value = parseAssignment();
+    return element_setter;
   }
   // 원소참조도 아니고, 변수도 아니라면 불가능한 연산임
+  // 그러므로, a = (3 > 4) = 6; 과 같이 적절하지 않은 연산은 이곳에서 걸러짐
   cout << "invalid assignment attempt detected";
   exit(1);
 }
 
 Expression* parseOr() {
-  auto result = parseAnd();
+  auto parsed = parseAnd();
   // LogicalOr(||) 조건은 연속으로 이어 쓰는게 가능하므로 while을 통해 LogicalOr가 존재하지 않을 때 까지 연속으로 실행한다.
   while (skipCurrentIf(Kind::LogicalOr)) {
-    // Or가 연속으로 존재한다는 것은 사실, Or의 우변에 n번째 Or들이 포함된다는 것이다(좌결합 연산이므로)
+    // Or가 연속된다면, Or의 우변에 n번째 Or들이 포함된다는 것이다(좌결합 연산이므로)
     // 그러므로 Or가 nest될 수 있도록 while안에서 처리해준다
-    auto tempOr = new Or();
+    auto temp_or = new Or();
     // 첫 루프에서 result가 lhs가 될 수 있는 이유는 애초에 current가 LogicalOr가 아니었다면 while문에 진입조차 하지 못했을 것이기 때문이다.
-    tempOr->lhs = result;
+    temp_or->lhs = parsed;
     // parseAnd인 이유는 parseOr함수 첫 줄과 마찬가지로 토큰이 LogicalOr전까지만 진행되고 멈춰야하기 때문이다
-    tempOr->rhs = parseAnd();
-    result = tempOr;
+    temp_or->rhs = parseAnd();
+    parsed = temp_or;
   }
   // 즉, 함수 첫줄의 parseAnd의 result가 실행된 후 current의 위치가 ||가 아니었다면 Or객체가 아닌 다른 상위의 Expression객체였을 것이다.
-  return result;
+  return parsed;
 }
 
-Expression* parseAnd() {
-  return {};
+auto parseAnd()->Expression* {
+  auto parsed = parseRelational();
+  return;
 }
 
+auto parseRelational()->Expression* {
+  auto parsed = parseAddOrSubtract();
+  return;
+}
+
+auto parseAddOrSubtract()->Expression* {
+  auto parsed = parseMultiplicationOrDivide();
+  return;
+}
+
+auto parseMultiplicationOrDivide()->Expression* {
+  auto parsed = parseElementAccessOrFunctionCall();
+  return;
+}
+
+
+auto parseElementAccessOrFunctionCall()->Expression* {
+  auto parsed = parseVariableOrLiterals();
+  // 원소 접근이거나 함수호출이 아니라면 역할 종료
+  if (current->kind != Kind::LeftBracket || current->kind != Kind::LeftParen) 
+    return parsed;
+  
+  // 원소 접근
+  if (skipCurrentIf(Kind::LeftBracket)) {
+    
+  }
+  if (skipCurrentIf(Kind::LeftParen)) {
+
+  }
+}
+
+// 주의: 이곳은 array literal과 object literal은 제외입니다.
+// variable과 literals가 같은 우선순위로 평가되어야 하는 이유
+// 예를 들어, [](원소접근) 혹은 ()(함수호출) 연산은 인자가 필요한데, 이 인자로 변수를 받는 것이 가능하다.
+// const a = 1; arr[a] = 3; 따위 이다. arr또한 어가가에 선언된 변수이므로 먼저 평가되어야 할 것은 자명하다.
+// 그러므로 변수, 문자, 숫자는 동일한 우선순위 평가대상이다
+auto parseVariableOrLiterals()->Expression* {
+  auto parsed = parseArrayLiteralOrObjectLiteral();
+  Kind kind = current->kind;
+  switch(kind) {
+    case Kind::StringLiteral:{
+      auto string_literal = new StringLiteral();
+      string_literal->value = current->code;
+      skipCurrent(Kind::StringLiteral);
+      
+      return string_literal;
+    }
+
+    case Kind::NumberLiteral:{
+      auto number_literal = new NumberLiteral();
+      number_literal->value = stod(current->code);
+      skipCurrent(Kind::NumberLiteral);
+      
+      return number_literal;
+    }
+
+    case Kind::Identifier:{
+      // 이름은 variable이지만 정확히 말하면 identifier다
+      // 미리 정의된 함수의 identifier일 수도 있기 때문에 변수라는 말이 어울리지 않을 수도 있지만
+      // 함수도 무조건 값으로 취급하는 js의 특성과 잘 맞는 부분이기도 하다
+      auto getter = new GetVariable();
+      getter->name = current->code;
+      skipCurrent(Kind::Identifier);
+      
+      return getter;
+    }
+
+    case Kind::TrueLiteral:{
+
+    }
+
+    case Kind::FalseLiteral:{
+
+    }
+
+    case Kind::NullLiteral:{
+
+    }
+  }
+}
+
+auto parseArrayLiteralOrObjectLiteral()->Expression* {
+
+}
 
 
 

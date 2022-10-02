@@ -35,6 +35,8 @@ static map<string, Kind> stringToKind = {
   {"||",          Kind::LogicalOr},
 
   {"=",           Kind::Assignment},
+  {"+=",          Kind::AddAssignment},
+  {"-=",          Kind::SubtractAssignment},
 
   {"+",           Kind::Add},
   {"-",           Kind::Subtract},
