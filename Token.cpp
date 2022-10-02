@@ -74,7 +74,7 @@ static auto kindToString = [] {
 }();
 
 
-Kind toKind(string string) {
+auto toKind(string string)->Kind {
   // count는 존재하는지를 검증. at은 key에 대응되는 value가져오기
   if (stringToKind.count(string)) return stringToKind.at(string);
   // Unknown by default

@@ -310,29 +310,30 @@ Expression* parseOr() {
 
 auto parseAnd()->Expression* {
   auto parsed = parseRelational();
-  return;
+  return parsed;
 }
 
 auto parseRelational()->Expression* {
   auto parsed = parseAddOrSubtract();
-  return;
+  return parsed;
 }
 
 auto parseAddOrSubtract()->Expression* {
   auto parsed = parseMultiplicationOrDivide();
-  return;
+  return parsed;
 }
 
 auto parseMultiplicationOrDivide()->Expression* {
   auto parsed = parseElementAccessOrFunctionCall();
-  return;
+  return parsed;
 }
 
 
 auto parseElementAccessOrFunctionCall()->Expression* {
   auto parsed = parseVariableOrLiterals();
   // 원소 접근이거나 함수호출이 아니라면 역할 종료
-  if (current->kind != Kind::LeftBracket || current->kind != Kind::LeftParen) 
+  auto kind = current->kind;
+  if (kind != Kind::LeftBracket || kind != Kind::LeftParen || kind != Kind::Dot) 
     return parsed;
   
   // 원소 접근
@@ -342,6 +343,22 @@ auto parseElementAccessOrFunctionCall()->Expression* {
   if (skipCurrentIf(Kind::LeftParen)) {
 
   }
+  skipCurrent(Kind::Dot);
+  auto method = new Method();
+  method->this_ptr = parsed;
+  method->method = current->code;
+  skipCurrent(Kind::Identifier);
+  // 메서드 호출처리 더해줘야함
+  // 원래라면 하위함수에서 identifier를 받아서 여기서 호출 parsing임
+  // 근데 메서드 호출하는 dot연산을 할 곳이 없음
+  // 그럼 아래에서 메서드도 Identifier로 받으면 되는 것 아닌가라고 생각할 수 있지만
+  // 중요한 것은 method는 this_ptr이 필요하다는 것임
+  // 그 this_ptr은 array literal이건 object literal이건 identifier건 여기서 확정되게 된다.
+  // 그렇다면 체인 메서드는? 체인메서드도 여기서 한번에 처리해야한다!
+  // 그 근거는 명확한데, 연산의 우선순위가 동일하기 때문이다
+  // 무슨 말이냐면, [].map().reduce()가 어차피 reduce까지 한번에 실행되어야한다는 소리다.
+  // 또한, arguments를 expression으로 평가하고, 무기명 함수를 받는 로직을 새로이 작성해야한다.
+  return method;
 }
 
 // 주의: 이곳은 array literal과 object literal은 제외입니다.
@@ -351,8 +368,9 @@ auto parseElementAccessOrFunctionCall()->Expression* {
 // 그러므로 변수, 문자, 숫자는 동일한 우선순위 평가대상이다
 auto parseVariableOrLiterals()->Expression* {
   auto parsed = parseArrayLiteralOrObjectLiteral();
-  Kind kind = current->kind;
-  switch(kind) {
+  if (parsed != nullptr) return parsed; 
+  
+  switch(current->kind) {
     case Kind::StringLiteral:{
       auto string_literal = new StringLiteral();
       string_literal->value = current->code;
@@ -394,20 +412,45 @@ auto parseVariableOrLiterals()->Expression* {
   }
 }
 
+// 최후순위 평가 대상: array literal과 object literal
+// array나 object내의 값은 할당이 없으므로 parseAnd부터 재귀를 돈다
 auto parseArrayLiteralOrObjectLiteral()->Expression* {
+  if (skipCurrentIf(Kind::LeftBracket)) {
+    auto array = new ArrayLiteral();
+    
+    while (current->kind != Kind::RightBracket) {
+      auto parsed = parseAnd();
+      array->values.push_back(parsed);
+      skipCurrentIf(Kind::Comma);
+    }
 
+    skipCurrent(Kind::RightBracket);
+
+    return array;
+  }
+
+  if (skipCurrentIf(Kind::LeftBrace)) {
+    auto object = new ObjectLiteral();
+    
+    while (current->kind != Kind::RightBrace) {
+      auto kind = current->kind;
+      if (kind == Kind::NumberLiteral || kind == Kind::StringLiteral || kind == Kind::Identifier) {
+        string key = current->code;
+        skipCurrent(current->kind);
+        skipCurrent(Kind::Colon);
+        Expression* value = parseAnd();
+        object->values.insert({ key, value });
+      } else {
+        cout << "Object key must be number or string" << endl;
+        exit(1);
+      }
+
+      skipCurrentIf(Kind::Comma);
+    }
+    skipCurrent(Kind::RightBrace);
+
+    return object;
+  }
+
+  return nullptr;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

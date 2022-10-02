@@ -88,5 +88,6 @@ any StringLiteral::interpret() {
   return value;
 };
 any ArrayLiteral::interpret() {return 1;};
-any MapLiteral::interpret() {return 1;};
+any ObjectLiteral::interpret() {return 1;};
+any Method::interpret() {return 1;};
 

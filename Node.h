@@ -242,3 +242,10 @@ struct ObjectLiteral: Expression {
   any interpret();
 };
 
+struct Method: Expression {
+  Expression* this_ptr;
+  string method;
+  vector<any> arguments;
+  any interpret();
+};
+
