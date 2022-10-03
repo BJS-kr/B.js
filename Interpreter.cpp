@@ -29,14 +29,19 @@ void interpret(Program* program) {
   // 모든 함수를 functionTable에 등록한 후, main이라는 함수가 없으면 즉시 종료
   // main이 있다면 main부터 실행하면서 main내부의 함수를 차례차례 실행하는 방식
   if (functionTable["main"] == nullptr) return;
+  cout << "function main found, starting interpret..." << endl;
   functionTable["main"]->interpret();
 }
 /**
  * @brief Statement Interpreters
  */
 void Function::interpret() {
-  for (auto& node: block)
+  for (auto& node: block) {
+    if (dynamic_cast<ExpressionStatement*>(node)) cout << "Expression statement found" << endl;
     node->interpret();
+  }
+
+    
 };
 void Return::interpret() {};
 void Variable::interpret() {};
@@ -45,11 +50,13 @@ void Break::interpret() {};
 void Continue::interpret() {};
 void If::interpret() {};
 void Console::sequencePrint() {
+    cout << "sequence printing started" << endl;
     for (const auto& node:arguments) {
-    auto value = node->interpret();
-    cout << value << " ";
+      auto value = node->interpret();
+      cout << value << " ";
    }
     cout << endl;
+    cout << "sequenced printing ended" << endl;
 }
 void Console::interpret() {
   // 주의할 것은, 사실 range-based for-loop에서는
@@ -57,6 +64,7 @@ void Console::interpret() {
   // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
   // 물론 &&는 일반적으로 r l value를 모두 참조할 수 있어서 좋다는 거고 아래처럼 lvalue가 확실할 때는 그냥 &로 적어도된다. 
   if (consoleMethod == "log") {
+    cout << "console method: log" << endl;
     cout << def;
     sequencePrint();
   }
@@ -66,7 +74,12 @@ void Console::interpret() {
   }
 
 };
-void ExpressionStatement::interpret() {};
+void ExpressionStatement::interpret() {
+  if (auto method = dynamic_cast<Method*>(expression)) {
+    cout << "Method found" << endl;
+    method->interpret();
+  }
+};
 
 /**
  * @brief Expression Interpreters 
@@ -74,20 +87,57 @@ void ExpressionStatement::interpret() {};
 any Or::interpret() {return 1;};
 any And::interpret() {return 1;};
 any Relational::interpret() {return 1;};
-any Arithmetic::interpret() {return 1;};
+any Arithmetic::interpret() {
+  auto left_value = lhs->interpret();
+  auto right_value = rhs->interpret();
+
+  if (kind == Kind::Add && isNumber(left_value) && isNumber(right_value)) 
+    return toNumber(left_value) + toNumber(right_value);
+  if (kind == Kind::Add && isString(left_value) && isString(right_value))
+    return toString(left_value) + toString(right_value);
+  if (kind == Kind::Subtract && isNumber(left_value) && isNumber(right_value))
+    return toNumber(left_value) - toNumber(right_value);
+  if (kind == Kind::Multiply && isNumber(left_value) && isNumber(right_value)) {
+    cout << "Arithmetic: multiply interpreting..." << endl;
+    return toNumber(left_value) * toNumber(right_value);
+  }
+    
+};  
 any Unary::interpret() {return 1;};
 any Call::interpret() {return 1;};
 any GetElement::interpret() {return 1;};
 any SetElement::interpret() {return 1;};
-any GetVariable::interpret() {return 1;};
+any GetVariable::interpret() {
+  if (name == "console") {
+    cout << "getting variable: console" << endl;
+    return new Console();
+  }
+};
 any SetVariable::interpret() {return 1;};
 any NullLiteral::interpret() {return 1;};
 any BooleanLiteral::interpret() {return 1;};
-any NumberLiteral::interpret() {return 1;}
+any NumberLiteral::interpret() {
+  cout << "number literal interpreting..." << endl;
+  return value;
+}
 any StringLiteral::interpret() {
   return value;
 };
 any ArrayLiteral::interpret() {return 1;};
 any ObjectLiteral::interpret() {return 1;};
-any Method::interpret() {return 1;};
+any Method::interpret() {
+  // method객체가 아닌 getvariable객체라는 것은 메서드 체인이라고 하더라도 시작점에 도달했다는 의미
+  // 즉, 그게 무엇이 되었던 정의된 객체일 것임
+  // 메서드의 this_ptr은 언제나 literal, variable, method(메서드 체인일 경우) 밖에 없음
+  if (auto get_variable = dynamic_cast<GetVariable*>(this_ptr)) {
+    cout << "method start point(GetVariable) found" << endl;
+    auto this_object = get_variable->interpret();
+    if (auto console = any_cast<Console*>(this_object)){
+      cout << "start point: console initialized" << endl;
+      console->consoleMethod = method;
+      console->arguments = arguments;
+      console->interpret();
+    }
+  }
+};
 

@@ -29,7 +29,6 @@ static map<string, Kind> stringToKind = {
   {"if",          Kind::If},
   {"elif",        Kind::Elif},
   {"else",        Kind::Else},
-  {"console",     Kind::Console},
 
   {"&&",          Kind::LogicalAnd},
   {"||",          Kind::LogicalOr},

@@ -145,6 +145,7 @@ struct Relational: Expression {
 };
 
 struct Arithmetic: Expression {
+  Arithmetic(Kind kind): kind(kind){};
   Kind kind;
   Expression* lhs;
   Expression* rhs;
@@ -245,7 +246,7 @@ struct ObjectLiteral: Expression {
 struct Method: Expression {
   Expression* this_ptr;
   string method;
-  vector<any> arguments;
+  vector<Expression*> arguments;
   any interpret();
 };
 

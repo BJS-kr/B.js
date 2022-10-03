@@ -138,33 +138,15 @@ vector<Statement*> parseBlock() {
         block.push_back(parseVar());
         break;
       case Kind::Constant:
+        block.push_back(parseConst());
         break;
       case Kind::Let:
+        block.push_back(parseLet());
         break;
-      case Kind::Console: {
-        auto console = new Console();
-        auto stringLiteral = new StringLiteral();
-
-        skipCurrent(Kind::Console);
-        skipCurrent(Kind::Dot);
-        console->consoleMethod = current->code;
-        skipCurrent(Kind::Identifier); // console method
-
-        skipCurrent(Kind::LeftParen);
-        stringLiteral->value = current->code;
-        console->arguments = { stringLiteral };
-        block.push_back(console);
-        skipCurrent(Kind::StringLiteral);
-        skipCurrent(Kind::RightParen);
-        skipCurrent(Kind::Semicolon);
-        break;
-      }
-        
       case Kind::EndOfToken: {
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
         exit(1);
       }
-
       default:
         block.push_back(parseExpressionStatement());
     }
@@ -246,9 +228,10 @@ Expression* parseExpression() {
 // 소비되지 않는, 그러니까 문에 포함되지 않는 식을 발견했을때 문으로 감싸기 위한 함수라는 것이다.
 // 문으로 감싸야 하는 이유는 프로그램이 '구문'을 소비하기 때문이다. Statement타입이 아니면 소비할 수 없다.
 ExpressionStatement* parseExpressionStatement() {
+  cout << "parse expression statement: " << current->code << endl;;
   auto expressionStatement = new ExpressionStatement();
   expressionStatement->expression = parseExpression();
-
+  cout << "parse complete: " << current->code << endl;
   skipCurrent(Kind::Semicolon);
 
   return expressionStatement;
@@ -325,39 +308,113 @@ auto parseAddOrSubtract()->Expression* {
 
 auto parseMultiplicationOrDivide()->Expression* {
   auto parsed = parseElementAccessOrFunctionCall();
-  return parsed;
+  
+  auto kind = current->kind;
+  if (kind != Kind::Multiply && kind != Kind::Divide)
+    return parsed;
+  
+  if (kind == Kind::Multiply) {
+    cout << "multiply: " << current->code << endl;
+    auto multiply = new Arithmetic(Kind::Multiply);
+    multiply->lhs = parsed;
+    skipCurrent(Kind::Multiply);
+    multiply->rhs = parseExpression();
+
+    kind = current->kind;
+    while (skipCurrentIf(Kind::Multiply) || skipCurrentIf(Kind::Divide)) {
+      auto temp_multiply = multiply;
+      if (kind == Kind::Multiply) {
+        multiply = new Arithmetic(Kind::Multiply);
+        multiply->lhs = temp_multiply;
+        multiply->rhs = parseExpression();
+      }
+      if (kind == Kind::Divide) {
+        multiply = new Arithmetic(Kind::Divide);
+        multiply->lhs = temp_multiply;
+        multiply->rhs = parseExpression();
+      }
+      kind = current->kind;
+    }
+
+    return multiply;
+  }
+
+  if (kind == Kind::Divide) {
+    auto divide = new Arithmetic(Kind::Divide);
+    divide->lhs = parsed;
+    skipCurrent(Kind::Divide);
+    divide->rhs = parseExpression();
+
+    kind = current->kind;
+    while (skipCurrentIf(Kind::Multiply) || skipCurrentIf(Kind::Divide)) {
+      auto temp_divide = divide;
+      if (kind == Kind::Multiply) {
+        divide = new Arithmetic(Kind::Multiply);
+        divide->lhs = temp_divide;
+        divide->rhs = parseExpression();
+      }
+      if (kind == Kind::Divide) {
+        divide = new Arithmetic(Kind::Divide);
+        divide->lhs = temp_divide;
+        divide->rhs = parseExpression();
+      }
+      kind = current->kind;
+    }
+
+    return divide;
+  }
 }
 
 
 auto parseElementAccessOrFunctionCall()->Expression* {
   auto parsed = parseVariableOrLiterals();
-  // 원소 접근이거나 함수호출이 아니라면 역할 종료
+  // 원소 접근이거나 함수호출이거나 메서드 호출이 아니라면 역할 종료
   auto kind = current->kind;
-  if (kind != Kind::LeftBracket || kind != Kind::LeftParen || kind != Kind::Dot) 
+  if (kind != Kind::LeftBracket && kind != Kind::LeftParen && kind != Kind::Dot) 
     return parsed;
   
   // 원소 접근
   if (skipCurrentIf(Kind::LeftBracket)) {
     
   }
+  // 함수 호출
   if (skipCurrentIf(Kind::LeftParen)) {
 
   }
+  // 메서드 호출
+  cout << "method: " << current->code << endl;
   skipCurrent(Kind::Dot);
+
   auto method = new Method();
+
   method->this_ptr = parsed;
   method->method = current->code;
   skipCurrent(Kind::Identifier);
-  // 메서드 호출처리 더해줘야함
-  // 원래라면 하위함수에서 identifier를 받아서 여기서 호출 parsing임
-  // 근데 메서드 호출하는 dot연산을 할 곳이 없음
-  // 그럼 아래에서 메서드도 Identifier로 받으면 되는 것 아닌가라고 생각할 수 있지만
-  // 중요한 것은 method는 this_ptr이 필요하다는 것임
-  // 그 this_ptr은 array literal이건 object literal이건 identifier건 여기서 확정되게 된다.
-  // 그렇다면 체인 메서드는? 체인메서드도 여기서 한번에 처리해야한다!
-  // 그 근거는 명확한데, 연산의 우선순위가 동일하기 때문이다
-  // 무슨 말이냐면, [].map().reduce()가 어차피 reduce까지 한번에 실행되어야한다는 소리다.
-  // 또한, arguments를 expression으로 평가하고, 무기명 함수를 받는 로직을 새로이 작성해야한다.
+  skipCurrent(Kind::LeftParen);
+
+  while (current->kind != Kind::RightParen) {
+    cout << "parsing method arguments: " << current->code << endl;
+    method->arguments.push_back(parseExpression());
+    skipCurrentIf(Kind::Comma);
+  }
+  skipCurrent(Kind::RightParen);
+  
+  // chained method를 검증
+  while (skipCurrentIf(Kind::Dot)) {
+    auto temp_method = method;
+    method = new Method();
+    method->this_ptr = method;
+    method->method = current->code;
+    skipCurrent(Kind::Identifier);
+    skipCurrent(Kind::LeftParen);
+
+    while (current->kind != Kind::RightParen) {
+      method->arguments.push_back(parseExpression());
+      skipCurrentIf(Kind::Comma);
+    }
+    skipCurrent(Kind::RightParen);  
+  }
+  cout << "method parsing complete: " << current->code << endl;
   return method;
 }
 
@@ -370,6 +427,7 @@ auto parseVariableOrLiterals()->Expression* {
   auto parsed = parseArrayLiteralOrObjectLiteral();
   if (parsed != nullptr) return parsed; 
   
+
   switch(current->kind) {
     case Kind::StringLiteral:{
       auto string_literal = new StringLiteral();
@@ -380,6 +438,7 @@ auto parseVariableOrLiterals()->Expression* {
     }
 
     case Kind::NumberLiteral:{
+      cout << "number literal: " << current->code << endl;
       auto number_literal = new NumberLiteral();
       number_literal->value = stod(current->code);
       skipCurrent(Kind::NumberLiteral);
@@ -399,16 +458,16 @@ auto parseVariableOrLiterals()->Expression* {
     }
 
     case Kind::TrueLiteral:{
-
+      break;
     }
-
     case Kind::FalseLiteral:{
-
+      break;
     }
-
     case Kind::NullLiteral:{
-
+      break;
     }
+    default:
+      return parsed;
   }
 }
 
