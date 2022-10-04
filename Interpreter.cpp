@@ -1,3 +1,5 @@
+#define GLOBAL "global"
+
 #include "Node.h"
 #include "Datatype.h"
 #include "Log.h"
@@ -6,6 +8,7 @@
 
 using std::map;
 using std::vector;
+using std::make_pair;
 
 static map<string, Statement*> global_variables = {
   {"console", new Console()}
@@ -24,9 +27,9 @@ void interpret(Program* program) {
   // 간단히 말하자면 0으로 평가될 위험이 없음. 포인터 타입으로만 평가됨
   // 모든 함수를 functionTable에 등록한 후, main이라는 함수가 없으면 즉시 종료
   // main이 있다면 main부터 실행하면서 main내부의 함수를 차례차례 실행하는 방식
-  if (functionTable["global"] == nullptr) return;
+  if (functionTable[GLOBAL] == nullptr) return;
   info("function global found, starting interpret...");
-  functionTable["global"]->interpret();
+  functionTable[GLOBAL]->interpret();
   print_log();
 }
 /**
@@ -39,7 +42,43 @@ void Function::interpret() {
   }
 };
 void Return::interpret() {};
-void Variable::interpret() {};
+void Declare::interpret() {
+  auto initial_value = make_pair(name, VariableState{false, nullptr});
+
+  switch(decl_type) {
+    case Kind::Constant: {
+      auto constants = lexical_environment->variables.at(Kind::Constant);
+      if (constants.find(name) == constants.end()) 
+        constants.insert(initial_value);
+      else {
+        cout << "Cannot declare constant variable twice";
+        exit(1);
+      }
+      break;
+    }
+    case Kind::Let: {
+      auto lets = lexical_environment->variables.at(Kind::Let);
+      if (lets.find(name) == lets.end()) 
+        lets.insert(initial_value);
+      else {
+        cout << "Cannot declare let variable twice";
+        exit(1);
+      }
+      break;
+    }
+    case Kind::Variable: {
+      auto variables = lexical_environment->variables.at(Kind::Variable);
+      variables.insert(initial_value);
+      break;
+    }
+    default: 
+      cout << "Unknown declaration type detected. Declaration must be one of const, let, var";
+      exit(1); 
+  }
+  // if와 for의 구현에 대한 생각:
+  // 어차피 스코프 체인을 염두에 둔다면 무엇이던 간에 블락 스코프 체인임
+  // 즉, 항상 상위 스코프만 기억하면 되므로 기존의 구현을 수정할 필요가 있음
+};
 void For::interpret() {};
 void Break::interpret() {};
 void Continue::interpret() {};
@@ -67,7 +106,6 @@ void Console::interpret() {
     cout << red;
     sequencePrint();
   }
-
 };
 void ExpressionStatement::interpret() {
   if (auto method = dynamic_cast<Method*>(expression)) {
@@ -119,7 +157,9 @@ any GetVariable::interpret() {
     return dynamic_cast<Console*>(global_variables.at("console"));
   }
 };
-any SetVariable::interpret() {return 1;};
+any SetVariable::interpret() {
+  
+};
 any NullLiteral::interpret() {return 1;};
 any BooleanLiteral::interpret() {return 1;};
 any NumberLiteral::interpret() {

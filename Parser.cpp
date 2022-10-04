@@ -15,7 +15,7 @@ using std::stod;
 
 // static으로 선언해두고, parse함수에서 초기화한다.
 static vector<Token>::iterator current;
-
+static LexicalEnvironment* current_block_scope = nullptr;
 // auto는 자명한 타입추론 뿐 아니라 함수 줄 맞춤에도 큰 효과가 있는 것 같다. 엄청 깔끔해보인다 :)
 static auto skipCurrent(Kind)->void;
 static auto skipCurrentIf(Kind)->bool;
@@ -30,13 +30,10 @@ static auto parseVariableOrLiterals()->Expression*;
 static auto parseArrayLiteralOrObjectLiteral()->Expression*;
 static auto parseExpression()->Expression*;
 static auto parseExpressionStatement()->ExpressionStatement*;
-static auto parseVar()->Variable*;
-static auto parseConst()->Variable*;
-static auto parseLet()->Variable*;
+static auto parseDeclare(Declare*)->Declare*;
 static auto parseParameters()->vector<string>;
 static auto parseBlock()->vector<Statement*>;
 static auto parseFunction()->Function*;
-static auto getVariableNameAndParseExpression(Variable*)->void;
 
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
@@ -86,6 +83,8 @@ Function* parseFunction() {
     skipCurrent(Kind::Function);
     // 생성한 함수 노드에 이름을 붙여준다. function 키워드 이후에 온 함수 이름이다.
     function->name = current->code;
+    function->upper_scope = current_block_scope;
+    current_block_scope = function;
     // 함수건 변수건 이름은 식별자이다. 식별자로 판단되지 않았으면 에러이므로 skipCurrent함수로 검사해준다.
     skipCurrent(Kind::Identifier);
     // 함수의 식별자 다음엔 매개 변수들이 위치할 것이다. 매개 변수는 좌괄호로 시작하므로
@@ -100,6 +99,8 @@ Function* parseFunction() {
     skipCurrent(Kind::LeftBrace);
     function->block = parseBlock();
     skipCurrent(Kind::RightBrace);
+
+    current_block_scope = function->upper_scope;
 
     return function;
   }
@@ -135,13 +136,16 @@ vector<Statement*> parseBlock() {
       // 향후 let과 const도 처리하려면 이곳에서 처리를 추가하면 된다.
       // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
       case Kind::Variable:
-        block.push_back(parseVar());
+        skipCurrent(Kind::Variable);
+        block.push_back(parseDeclare(new Declare(Kind::Variable)));
         break;
       case Kind::Constant:
-        block.push_back(parseConst());
+        skipCurrent(Kind::Constant);
+        block.push_back(parseDeclare(new Declare(Kind::Constant)));
         break;
       case Kind::Let:
-        block.push_back(parseLet());
+        skipCurrent(Kind::Let);
+        block.push_back(parseDeclare(new Declare(Kind::Let)));
         break;
       case Kind::EndOfToken: {
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
@@ -151,47 +155,25 @@ vector<Statement*> parseBlock() {
         block.push_back(parseExpressionStatement());
     }
   }
+
   return block;
 }
 
 
-auto getVariableNameAndParseExpression(Variable* variable)->void {
-  variable->name = current->code;
-  skipCurrent(Kind::Identifier);
-  skipCurrent(Kind::Assignment);// 상술한대로 토큰 자체는 생략된다.
-  // 사실 이는 var과 let에 한해서 js스펙에 걸맞지 않은데, const는 항상 즉시 초기화가 필요한 반면 var과 let은 초기화를 미룰 수 있기 때문이다.
-  // 그러므로 Assignment를 즉시 검증하는 것은 올바르지 않고, const의 경우에만 위의 구현이 올바르다.
-  // var이나 let이라면 즉시 초기화하는 경우와 미루는 경우를 둘다 판단해야하고, 미뤘다고 판단하면 expression은 undefined를 할당해야하는데 그냥 null로 퉁치겠다.
-  variable->expression = parseExpression();
-  skipCurrent(Kind::Semicolon);// 이것도 js스펙과는 맞지 않는다. js는 semicolon없이도 구문 트리를 생성할 수 있기 때문이다. 
-  // 다만 세미콜론 없이도 줄바꿈으로 초기화 종료를 판단하는 것은 간단한데, 둘다 검증하면 되기 때문이다. 
-  // 그렇게 하려면 skipCurrent 함수의 인자는 vector<Kind>가 되어 여러 요소를 순회하며 검증하는 식이 되어야 할것이다. 템플릿 특수화를 하던가..
-  // 일단은 간단한 구현으로 완성하는게 먼저이니 굳이 구현하지 않겠다. 
+Declare* parseDeclare(Declare* declare){
+  declare->lexical_environment = current_block_scope;
+  if (current->kind != Kind::Identifier) {
+    cout << "must provide identifier when declare";
+    exit(1);
+  };
+  declare->name = current->code;
+  // !!매우 중요!! code를 할당하고 iterator를 전진시키지 않는 이유
+  // 이렇게 하면 iterator가 선언된 변수의 식별자에 머물게 된다
+  // 그렇다면 다음 루프의 파싱에 identifier경로로 파싱이 진입하게 되고
+  // 자동으로 변수가 할당된다
+  return declare;
 }
 
-Variable* parseVar() {
-  auto var = new Variable("var");
-  skipCurrent(Kind::Variable);
-  getVariableNameAndParseExpression(var);
-
-  return var;
-}
-
-Variable* parseConst() {
-  auto constant = new Variable("const");
-  skipCurrent(Kind::Constant);
-  getVariableNameAndParseExpression(constant);
-
-  return constant;
-}
-
-Variable* parseLet() {
-  auto let = new Variable("let");
-  skipCurrent(Kind::Let);
-  getVariableNameAndParseExpression(let);
-
-  return let;
-}
 
 // 구문 분석의 다른 부분들에서 토큰의 종류에 따라 분석하던 것과는 달리,
 // 식은 아무런 토큰이 없다면 식이다. if, for, function등 문의 시작을 알리는 요소가 존재하지 않기 때문이다.
@@ -257,6 +239,7 @@ Expression* parseAssignment() {
   if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
     auto variable_setter = new SetVariable();
     variable_setter->name = get_variable->name;
+    variable_setter->lexical_environment = get_variable->lexical_environment;
     variable_setter->value = parseAssignment();
     return variable_setter;
   }
@@ -519,6 +502,7 @@ auto parseVariableOrLiterals()->Expression* {
       // 함수도 무조건 값으로 취급하는 js의 특성과 잘 맞는 부분이기도 하다
       auto getter = new GetVariable();
       getter->name = current->code;
+      getter->lexical_environment = current_block_scope;
       skipCurrent(Kind::Identifier);
       
       return getter;

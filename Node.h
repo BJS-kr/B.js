@@ -28,13 +28,27 @@ struct Statement {
 struct Expression {
   virtual any interpret() = 0;
 };
+
+struct LexicalEnvironment {
+    // 상위 스코프. global이 아닌 이상 모든 Block은 이 값이 nullptr이 아니다.
+  LexicalEnvironment* upper_scope;
+  // var, let, const를 나누는 방안도 생각해보았으나, 변수 접근이 단지 식별자만 가지고 이루어진다는 점을 생각해보면 비효율 적인 방식
+  map<Kind, map<string, VariableState>> variables = {
+    {Kind::Constant, map<string, VariableState>()},
+    {Kind::Let, map<string, VariableState>()},
+    {Kind::Variable, map<string, VariableState>()}
+  };
+};
+struct VariableState {
+  bool initialized;
+  Expression* value;
+};
 // Function은 복합문이다. 그러므로 Statement를 상속받는다.
-struct Function: Statement {
+struct Function: LexicalEnvironment, Statement {
   // 함수 이름
   string name;
   // 파라미터들 이름
   vector<string> parameters;
-  map<string, Expression*> variables;
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
   vector<Statement*> block;
   
@@ -53,20 +67,25 @@ struct Return: Statement {
 };
 
 // 변수의 선언
-struct Variable: Statement {
-  Variable(string declareType):declareType(declareType) {}
-  string declareType;
+struct Declare: Statement {
+  Declare(Kind decl_type): decl_type(decl_type) {}
+  LexicalEnvironment* lexical_environment;
+  // initialized의 쓸모는 const일 경우 딱 하나 뿐이다
+  // 그 이유는 const가 var와 let과는 달리 선언과 동시에 초기화 되어야하기 때문인데,
+  // 컴파일러의 구조 상 선언과 할당이 분리 되어있기 때문에 const는 선언 다음에 바로 할당이 위치해야 한다는 뜻이다
+  // 그렇다면, initialized가 false일 경우 첫 할당만을 허용할 수 있다.
+  // const와 다르게 let, var는 initialized가 false이건 true건 할당할 수 있다. 그래서 initialized는 const를 위한 것이다
+  // 다만 let과 var도 init값에 따라 컨트롤 할 여지가 있으므로 정보에는 포함시킨다
+  Kind decl_type;
   // 변수 이름
   string name;
-  // 변수 선언엔 식을 넣을 수 있다
-  Expression* expression; 
   void interpret();
 };
 
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
-struct For: Statement {
+struct For: LexicalEnvironment, Statement {
   // for문을 위한 변수 선언(흔히 사용하는 i v등을 떠올려보자)
-  Variable* variable;
+  Declare* variable;
   // 조건식
   Expression* condition;
   // 증감식
@@ -86,7 +105,7 @@ struct Continue: Statement {
 }; 
 
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
-struct If: Statement {
+struct If: LexicalEnvironment, Statement {
   Expression* conditions;
   vector<Statement*> block;
   vector<Statement*> elseBlock;
@@ -201,13 +220,16 @@ struct SetElement: Expression {
   any interpret();
 };
 
-// 변수의 참조와 수정
+// 변수의 참조
 struct GetVariable: Expression {
+  LexicalEnvironment* lexical_environment;
   string name;
   any interpret();
 };
 
 struct SetVariable: Expression {
+  LexicalEnvironment* lexical_environment;
+  Kind decl_type;
   string name;
   Expression* value;
   any interpret();
