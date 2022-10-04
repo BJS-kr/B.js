@@ -291,21 +291,82 @@ Expression* parseOr() {
   return parsed;
 }
 
+// &&
 auto parseAnd()->Expression* {
   auto parsed = parseRelational();
   return parsed;
 }
 
+// == === != !== > < >= <=
 auto parseRelational()->Expression* {
   auto parsed = parseAddOrSubtract();
   return parsed;
 }
 
+// + -
 auto parseAddOrSubtract()->Expression* {
   auto parsed = parseMultiplicationOrDivide();
-  return parsed;
+  auto kind = current->kind;
+  if (kind != Kind::Add && kind != Kind::Subtract) 
+    return parsed;
+
+  if (skipCurrentIf(Kind::Add)) {
+    cout << "add: +" << endl;
+    
+    auto add = new Arithmetic(Kind::Add);
+    add->lhs = parsed;
+    add->rhs = parseMultiplicationOrDivide(); 
+
+    kind = current->kind;
+    while (skipCurrentIf(Kind::Add) || skipCurrentIf(Kind::Subtract)) {
+      if (kind == Kind::Add) {
+        cout << "add: +" << endl;
+        auto temp_add = add;
+        add = new Arithmetic(Kind::Add);
+        add->lhs = temp_add;
+        add->rhs = parseMultiplicationOrDivide();
+      } else {
+        cout <<"subtract: -" << endl;
+        auto temp_add = add;
+        add = new Arithmetic(Kind::Subtract);
+        add->lhs = temp_add;
+        add->rhs = parseMultiplicationOrDivide();
+      }
+      kind = current->kind;
+    } 
+
+    return add;   
+  }
+  if (skipCurrentIf(Kind::Subtract)) {
+    cout << "subtract: -" << endl;
+    
+    auto subtract = new Arithmetic(Kind::Subtract);
+    subtract->lhs = parsed;
+    subtract->rhs = parseMultiplicationOrDivide(); 
+
+    kind = current->kind;
+    while (skipCurrentIf(Kind::Add) || skipCurrentIf(Kind::Subtract)) {
+      if (kind == Kind::Add) {
+        cout << "add: +" << endl;
+        auto temp_subtract = subtract;
+        subtract = new Arithmetic(Kind::Add);
+        subtract->lhs = temp_subtract;
+        subtract->rhs = parseMultiplicationOrDivide();
+      } else {
+        cout <<"subtract: -" << endl;
+        auto temp_subtract = subtract;
+        subtract = new Arithmetic(Kind::Subtract);
+        subtract->lhs = temp_subtract;
+        subtract->rhs = parseMultiplicationOrDivide();
+      }
+      kind = current->kind;
+    } 
+
+    return subtract;   
+  }
 }
 
+// * /
 auto parseMultiplicationOrDivide()->Expression* {
   auto parsed = parseElementAccessOrFunctionCall();
   
@@ -318,24 +379,26 @@ auto parseMultiplicationOrDivide()->Expression* {
     auto multiply = new Arithmetic(Kind::Multiply);
     multiply->lhs = parsed;
     skipCurrent(Kind::Multiply);
-    multiply->rhs = parseExpression();
+    multiply->rhs = parseElementAccessOrFunctionCall();
 
     kind = current->kind;
     while (skipCurrentIf(Kind::Multiply) || skipCurrentIf(Kind::Divide)) {
       auto temp_multiply = multiply;
       if (kind == Kind::Multiply) {
+        cout << "continuous multiply detected" << endl;
         multiply = new Arithmetic(Kind::Multiply);
         multiply->lhs = temp_multiply;
-        multiply->rhs = parseExpression();
+        multiply->rhs = parseElementAccessOrFunctionCall();
       }
       if (kind == Kind::Divide) {
+        cout << "continuous divide detected" << endl;
         multiply = new Arithmetic(Kind::Divide);
         multiply->lhs = temp_multiply;
-        multiply->rhs = parseExpression();
+        multiply->rhs = parseElementAccessOrFunctionCall();
       }
       kind = current->kind;
     }
-
+    cout << "multiply returning" << endl;
     return multiply;
   }
 
@@ -343,7 +406,7 @@ auto parseMultiplicationOrDivide()->Expression* {
     auto divide = new Arithmetic(Kind::Divide);
     divide->lhs = parsed;
     skipCurrent(Kind::Divide);
-    divide->rhs = parseExpression();
+    divide->rhs = parseElementAccessOrFunctionCall();
 
     kind = current->kind;
     while (skipCurrentIf(Kind::Multiply) || skipCurrentIf(Kind::Divide)) {
@@ -351,12 +414,12 @@ auto parseMultiplicationOrDivide()->Expression* {
       if (kind == Kind::Multiply) {
         divide = new Arithmetic(Kind::Multiply);
         divide->lhs = temp_divide;
-        divide->rhs = parseExpression();
+        divide->rhs = parseElementAccessOrFunctionCall();
       }
       if (kind == Kind::Divide) {
         divide = new Arithmetic(Kind::Divide);
         divide->lhs = temp_divide;
-        divide->rhs = parseExpression();
+        divide->rhs = parseElementAccessOrFunctionCall();
       }
       kind = current->kind;
     }
@@ -365,7 +428,7 @@ auto parseMultiplicationOrDivide()->Expression* {
   }
 }
 
-
+// [] ()
 auto parseElementAccessOrFunctionCall()->Expression* {
   auto parsed = parseVariableOrLiterals();
   // 원소 접근이거나 함수호출이거나 메서드 호출이 아니라면 역할 종료
@@ -382,18 +445,19 @@ auto parseElementAccessOrFunctionCall()->Expression* {
 
   }
   // 메서드 호출
-  cout << "method: " << current->code << endl;
+  cout << "accessing method: " << current->code << endl;
   skipCurrent(Kind::Dot);
 
   auto method = new Method();
 
   method->this_ptr = parsed;
   method->method = current->code;
+  cout << "method name: " << current->code << endl;
   skipCurrent(Kind::Identifier);
   skipCurrent(Kind::LeftParen);
 
   while (current->kind != Kind::RightParen) {
-    cout << "parsing method arguments: " << current->code << endl;
+    cout << "parsing method arguments..." << endl;
     method->arguments.push_back(parseExpression());
     skipCurrentIf(Kind::Comma);
   }
@@ -401,6 +465,7 @@ auto parseElementAccessOrFunctionCall()->Expression* {
   
   // chained method를 검증
   while (skipCurrentIf(Kind::Dot)) {
+    cout << "method chain detected" << endl;
     auto temp_method = method;
     method = new Method();
     method->this_ptr = method;
@@ -409,12 +474,14 @@ auto parseElementAccessOrFunctionCall()->Expression* {
     skipCurrent(Kind::LeftParen);
 
     while (current->kind != Kind::RightParen) {
+      cout << "parsing method arguments..." << endl;
       method->arguments.push_back(parseExpression());
       skipCurrentIf(Kind::Comma);
     }
-    skipCurrent(Kind::RightParen);  
+    skipCurrent(Kind::RightParen);
   }
   cout << "method parsing complete: " << current->code << endl;
+
   return method;
 }
 
@@ -464,6 +531,9 @@ auto parseVariableOrLiterals()->Expression* {
       break;
     }
     case Kind::NullLiteral:{
+      break;
+    }
+    case Kind::UndefinedLiteral:{
       break;
     }
     default:

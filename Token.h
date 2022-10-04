@@ -1,4 +1,6 @@
-#pragma once
+#ifndef TOKEN
+#define TOKEN
+
 #include <string>
 
 using std::string;
@@ -6,7 +8,7 @@ using std::string;
 // enum class를 enum보다 prefer하는 이유는 type safety때문이다.
 enum class Kind {
   Unknown, EndOfToken,
-  NullLiteral,
+  NullLiteral, UndefinedLiteral,
   TrueLiteral, FalseLiteral,
   NumberLiteral, StringLiteral,
   Identifier,
@@ -42,3 +44,4 @@ struct Token {
   string code;
 };
 
+#endif

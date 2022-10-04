@@ -1,19 +1,15 @@
 #include "Node.h"
 #include "Datatype.h"
-#include "Color.h"
-#include <any>
+#include "Log.h"
 #include <map>
 #include <vector>
-#include <string>
-#include <iostream>
 
-using std::any;
 using std::map;
-using std::string;
 using std::vector;
-using std::cout;
-using std::endl;
 
+static map<string, Statement*> global_variables = {
+  {"console", new Console()}
+};
 static map<string, Function*> functionTable;
 static Color::Modifier red(Color::FG_RED);
 static Color::Modifier def(Color::FG_DEFAULT);
@@ -28,20 +24,19 @@ void interpret(Program* program) {
   // 간단히 말하자면 0으로 평가될 위험이 없음. 포인터 타입으로만 평가됨
   // 모든 함수를 functionTable에 등록한 후, main이라는 함수가 없으면 즉시 종료
   // main이 있다면 main부터 실행하면서 main내부의 함수를 차례차례 실행하는 방식
-  if (functionTable["main"] == nullptr) return;
-  cout << "function main found, starting interpret..." << endl;
-  functionTable["main"]->interpret();
+  if (functionTable["global"] == nullptr) return;
+  info("function global found, starting interpret...");
+  functionTable["global"]->interpret();
+  print_log();
 }
 /**
  * @brief Statement Interpreters
  */
 void Function::interpret() {
   for (auto& node: block) {
-    if (dynamic_cast<ExpressionStatement*>(node)) cout << "Expression statement found" << endl;
+    if (dynamic_cast<ExpressionStatement*>(node)) info("Expression statement found");
     node->interpret();
   }
-
-    
 };
 void Return::interpret() {};
 void Variable::interpret() {};
@@ -50,13 +45,13 @@ void Break::interpret() {};
 void Continue::interpret() {};
 void If::interpret() {};
 void Console::sequencePrint() {
-    cout << "sequence printing started" << endl;
+    info("sequence printing started");
     for (const auto& node:arguments) {
       auto value = node->interpret();
       cout << value << " ";
    }
     cout << endl;
-    cout << "sequenced printing ended" << endl;
+    info("sequenced printing ended");
 }
 void Console::interpret() {
   // 주의할 것은, 사실 range-based for-loop에서는
@@ -64,7 +59,7 @@ void Console::interpret() {
   // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
   // 물론 &&는 일반적으로 r l value를 모두 참조할 수 있어서 좋다는 거고 아래처럼 lvalue가 확실할 때는 그냥 &로 적어도된다. 
   if (consoleMethod == "log") {
-    cout << "console method: log" << endl;
+    info("console method: log");
     cout << def;
     sequencePrint();
   }
@@ -76,7 +71,7 @@ void Console::interpret() {
 };
 void ExpressionStatement::interpret() {
   if (auto method = dynamic_cast<Method*>(expression)) {
-    cout << "Method found" << endl;
+    info("Method found");
     method->interpret();
   }
 };
@@ -91,17 +86,28 @@ any Arithmetic::interpret() {
   auto left_value = lhs->interpret();
   auto right_value = rhs->interpret();
 
-  if (kind == Kind::Add && isNumber(left_value) && isNumber(right_value)) 
+  // add number
+  if (kind == Kind::Add && isNumber(left_value) && isNumber(right_value)) {
+    info("Arithmetic: number add interpreting...");
     return toNumber(left_value) + toNumber(right_value);
-  if (kind == Kind::Add && isString(left_value) && isString(right_value))
+  } 
+  
+  // add string
+  if (kind == Kind::Add && isString(left_value) && isString(right_value)) {
     return toString(left_value) + toString(right_value);
+  }
+  // subtract
   if (kind == Kind::Subtract && isNumber(left_value) && isNumber(right_value))
     return toNumber(left_value) - toNumber(right_value);
+  // multiply  
   if (kind == Kind::Multiply && isNumber(left_value) && isNumber(right_value)) {
-    cout << "Arithmetic: multiply interpreting..." << endl;
+    info("Arithmetic: multiply interpreting...");
     return toNumber(left_value) * toNumber(right_value);
   }
-    
+  if (kind == Kind::Divide && isNumber(left_value) && isNumber(right_value)) {
+    info("Arithmetic: multiply interpreting...");
+    return toNumber(left_value) / toNumber(right_value);
+  } 
 };  
 any Unary::interpret() {return 1;};
 any Call::interpret() {return 1;};
@@ -109,15 +115,15 @@ any GetElement::interpret() {return 1;};
 any SetElement::interpret() {return 1;};
 any GetVariable::interpret() {
   if (name == "console") {
-    cout << "getting variable: console" << endl;
-    return new Console();
+    info("getting global variable: console");
+    return dynamic_cast<Console*>(global_variables.at("console"));
   }
 };
 any SetVariable::interpret() {return 1;};
 any NullLiteral::interpret() {return 1;};
 any BooleanLiteral::interpret() {return 1;};
 any NumberLiteral::interpret() {
-  cout << "number literal interpreting..." << endl;
+  info("number literal interpreting...");
   return value;
 }
 any StringLiteral::interpret() {
@@ -130,10 +136,10 @@ any Method::interpret() {
   // 즉, 그게 무엇이 되었던 정의된 객체일 것임
   // 메서드의 this_ptr은 언제나 literal, variable, method(메서드 체인일 경우) 밖에 없음
   if (auto get_variable = dynamic_cast<GetVariable*>(this_ptr)) {
-    cout << "method start point(GetVariable) found" << endl;
+    info("method start point(GetVariable) found");
     auto this_object = get_variable->interpret();
     if (auto console = any_cast<Console*>(this_object)){
-      cout << "start point: console initialized" << endl;
+      info("start point: console initialized");
       console->consoleMethod = method;
       console->arguments = arguments;
       console->interpret();

@@ -1,4 +1,4 @@
-#include"Datatype.h"
+#include "Datatype.h"
 // 이곳의 함수들은 동적언어를 표방하기 위해 존재한다. 
 // 타이핑이 없는 언어는 항상 any여야하는데, 그 와중에도 연산시에는 데이터 타입이 필요하므로
 // 타입 캐스팅이 필요하다. 매번 반복되는 타입캐스팅 함수들을 이곳에 작성한 것이다.
@@ -23,8 +23,6 @@ bool isNumber(any value) {
 double toNumber(any value) {
   return any_cast<double>(value);
 }
-
-
 
 // cout을 위한 << 연산자 오버로딩
 // return value가 reference일 때: https://www.tutorialspoint.com/cplusplus/returning_values_by_reference.htm

@@ -12,7 +12,7 @@ auto main()->int {
   stringstream sourceBuffer;
   sourceBuffer << sourceStream.rdbuf();
 
-  string sourceCode = mainify(sourceBuffer.str());
+  string sourceCode = global(sourceBuffer.str());
 
   auto tokenList = scan(sourceCode);
   auto syntaxTree = parse(tokenList);

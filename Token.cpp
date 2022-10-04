@@ -10,6 +10,7 @@ static map<string, Kind> stringToKind = {
   {"#EndOfToken", Kind::EndOfToken},
   
   {"null",        Kind::NullLiteral},
+  {"undefined",   Kind::UndefinedLiteral},
   {"true",        Kind::TrueLiteral},
   {"false",       Kind::FalseLiteral},
   {"#Number",     Kind::NumberLiteral},

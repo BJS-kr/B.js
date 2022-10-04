@@ -1,4 +1,6 @@
-#pragma once
+#ifndef NODE
+#define NODE
+
 #include<vector>
 #include<string>
 #include<string>
@@ -32,6 +34,7 @@ struct Function: Statement {
   string name;
   // 파라미터들 이름
   vector<string> parameters;
+  map<string, Expression*> variables;
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
   vector<Statement*> block;
   
@@ -250,3 +253,4 @@ struct Method: Expression {
   any interpret();
 };
 
+#endif

@@ -1,3 +1,6 @@
+#ifndef CHAR_TYPE
+#define CHAR_TYPE
+
 enum class CharType {
   Unknown,
   WhiteSpace,
@@ -6,3 +9,5 @@ enum class CharType {
   IdentifierAndKeyword,
   OperatorAndPunctuator,
 };
+
+#endif

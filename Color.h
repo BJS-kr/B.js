@@ -1,3 +1,6 @@
+#ifndef COLOR
+#define COLOR
+
 #include <ostream>
 namespace Color {
     enum Code {
@@ -20,3 +23,5 @@ namespace Color {
         }
     };
 }
+
+#endif
