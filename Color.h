@@ -24,4 +24,7 @@ namespace Color {
     };
 }
 
+Color::Modifier red(Color::FG_RED);
+Color::Modifier def(Color::FG_DEFAULT);
+
 #endif

@@ -19,7 +19,8 @@ using std::any;
  * 결론적으로 statement는 statement과 expression을 포함할 수 있다.
  */
 
-
+// undefined
+struct Undefined {};
 // 문
 struct Statement {
   virtual void interpret() = 0;

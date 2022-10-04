@@ -10,12 +10,10 @@ using std::map;
 using std::vector;
 using std::make_pair;
 
-static map<string, Statement*> global_variables = {
-  {"console", new Console()}
-};
+static auto CONSOLE = new Console();
+static auto UNDEFINED = new Undefined();
+
 static map<string, Function*> functionTable;
-static Color::Modifier red(Color::FG_RED);
-static Color::Modifier def(Color::FG_DEFAULT);
 
 void interpret(Program* program) {
   // 아래의 for문은 단지 program에 등록된 함수들을 모두 functionTable에 등록시키는 것이다.
@@ -30,12 +28,12 @@ void interpret(Program* program) {
   if (functionTable[GLOBAL] == nullptr) return;
   info("function global found, starting interpret...");
   functionTable[GLOBAL]->interpret();
-  print_log();
 }
 /**
  * @brief Statement Interpreters
  */
 void Function::interpret() {
+  // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
   for (auto& node: block) {
     if (dynamic_cast<ExpressionStatement*>(node)) info("Expression statement found");
     node->interpret();
@@ -51,8 +49,7 @@ void Declare::interpret() {
       if (constants.find(name) == constants.end()) 
         constants.insert(initial_value);
       else {
-        cout << "Cannot declare constant variable twice";
-        exit(1);
+        error("Cannot declare constant variable twice");
       }
       break;
     }
@@ -61,8 +58,7 @@ void Declare::interpret() {
       if (lets.find(name) == lets.end()) 
         lets.insert(initial_value);
       else {
-        cout << "Cannot declare let variable twice";
-        exit(1);
+        error("Cannot declare let variable twice");
       }
       break;
     }
@@ -72,8 +68,7 @@ void Declare::interpret() {
       break;
     }
     default: 
-      cout << "Unknown declaration type detected. Declaration must be one of const, let, var";
-      exit(1); 
+      error("Unknown declaration type detected. Declaration must be one of const, let, var");
   }
   // if와 for의 구현에 대한 생각:
   // 어차피 스코프 체인을 염두에 둔다면 무엇이던 간에 블락 스코프 체인임
@@ -129,7 +124,6 @@ any Arithmetic::interpret() {
     info("Arithmetic: number add interpreting...");
     return toNumber(left_value) + toNumber(right_value);
   } 
-  
   // add string
   if (kind == Kind::Add && isString(left_value) && isString(right_value)) {
     return toString(left_value) + toString(right_value);
@@ -142,6 +136,7 @@ any Arithmetic::interpret() {
     info("Arithmetic: multiply interpreting...");
     return toNumber(left_value) * toNumber(right_value);
   }
+  // divide
   if (kind == Kind::Divide && isNumber(left_value) && isNumber(right_value)) {
     info("Arithmetic: multiply interpreting...");
     return toNumber(left_value) / toNumber(right_value);
@@ -154,19 +149,83 @@ any SetElement::interpret() {return 1;};
 any GetVariable::interpret() {
   if (name == "console") {
     info("getting global variable: console");
-    return dynamic_cast<Console*>(global_variables.at("console"));
+    return CONSOLE;
   }
+  while (lexical_environment != nullptr) {
+    auto variables = lexical_environment->variables;
+    
+    auto consts = variables.at(Kind::Constant);
+    auto lets = variables.at(Kind::Let);
+    auto vars = variables.at(Kind::Variable);
+
+    auto const_iter = consts.find(name);
+    auto let_iter = lets.find(name);
+    auto var_iter = vars.find(name);
+    
+    if (const_iter != consts.end()) {
+      info("Constant variable " + name + " found");
+      return consts.at(name).value;
+    } else if (let_iter != lets.end()) {
+      info("Let variable " + name + " found");
+      return lets.at(name).value;
+    } else if (var_iter != lets.end()) {
+      info("Var variable " + name + " found");
+      return vars.at(name).value;
+    } else {
+      info("Moving up to upper scope");
+      lexical_environment = lexical_environment->upper_scope;
+    }
+  }
+  cout << "Cannot find variable " << name << " in scope chains. returning UNDEFINED" << endl;
+  return UNDEFINED;
 };
 any SetVariable::interpret() {
-  
+  auto allocating_value = VariableState{true, value};
+  // lexical_environment가 nullptr이라는 것은 마지막 루프가 global이었다는 의미
+  while (lexical_environment != nullptr) {
+    auto variables = lexical_environment->variables;
+    
+    auto consts = variables.at(Kind::Constant);
+    auto lets = variables.at(Kind::Let);
+    auto vars = variables.at(Kind::Variable);
+
+    auto const_iter = consts.find(name);
+    auto let_iter = lets.find(name);
+    auto var_iter = vars.find(name);
+    
+    if (const_iter != consts.end()) {
+      if (!consts.at(name).initialized) {
+        const_iter->second = allocating_value;
+      } else {
+        error("Constant variable can be allocated only once");
+      }
+    } else if (let_iter != lets.end()) {
+      let_iter->second = allocating_value;
+    } else if (var_iter != lets.end()) {
+      var_iter->second = allocating_value;
+    } else {
+      lexical_environment = lexical_environment->upper_scope;
+    }
+  }
+        
+  if (lexical_environment == nullptr) {
+    error("Cannot find predefined variable. to allocate value to a variable, a variable must have been declared");
+  }
 };
-any NullLiteral::interpret() {return 1;};
-any BooleanLiteral::interpret() {return 1;};
+any NullLiteral::interpret() {
+  info("null literal interpreting..."); 
+  return NULL; 
+};
+any BooleanLiteral::interpret() { 
+  info("boolean literal interpreting...");
+  return value; 
+};
 any NumberLiteral::interpret() {
   info("number literal interpreting...");
   return value;
 }
 any StringLiteral::interpret() {
+  info("string literal interpreting...");
   return value;
 };
 any ArrayLiteral::interpret() {return 1;};
