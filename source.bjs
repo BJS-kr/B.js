@@ -1,3 +1,10 @@
-console.log(1 + 9 / 3 + 2 * 3 - 9 + 3 * 3);
-const a = 10;
-let b = 'BJS';
+var height = 171;
+const name = 'BJS';
+let age = 31;
+age = 32;
+
+var height = 181;
+console.log('My name:', name, 'My age:', age, 'My height:', height);
+console.log(weigth);
+console.log(1 + 3 * 6 / 3 + 4 * 2 / 5);
+name = 'bjs';

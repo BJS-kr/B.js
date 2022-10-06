@@ -11,7 +11,6 @@ using std::vector;
 using std::make_pair;
 
 static auto CONSOLE = new Console();
-static auto UNDEFINED = new Undefined();
 
 static map<string, Function*> functionTable;
 
@@ -29,13 +28,16 @@ void interpret(Program* program) {
   info("function global found, starting interpret...");
   functionTable[GLOBAL]->interpret();
 }
+
+string Undefined::interpret() { return "undefined"; };
 /**
  * @brief Statement Interpreters
  */
 void Function::interpret() {
   // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
   for (auto& node: block) {
-    if (dynamic_cast<ExpressionStatement*>(node)) info("Expression statement found");
+    if (dynamic_cast<Declare*>(node)) info("Declare found");
+    if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
     node->interpret();
   }
 };
@@ -45,26 +47,36 @@ void Declare::interpret() {
 
   switch(decl_type) {
     case Kind::Constant: {
-      auto constants = lexical_environment->variables.at(Kind::Constant);
-      if (constants.find(name) == constants.end()) 
-        constants.insert(initial_value);
-      else {
+      info("interpreting const variable declaration: " + name);
+      
+      if (lexical_environment->variables.at(Kind::Constant).find(name) == 
+          lexical_environment->variables.at(Kind::Constant).end()) {
+        info("declaring const variable: " + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
+        lexical_environment->variables.at(Kind::Constant).insert(initial_value);
+      } 
+      else 
         error("Cannot declare constant variable twice");
-      }
+      
       break;
     }
     case Kind::Let: {
-      auto lets = lexical_environment->variables.at(Kind::Let);
-      if (lets.find(name) == lets.end()) 
-        lets.insert(initial_value);
-      else {
-        error("Cannot declare let variable twice");
+      info("interpreting let variable declaration: " + name);
+      
+      if (lexical_environment->variables.at(Kind::Let).find(name) == 
+          lexical_environment->variables.at(Kind::Let).end()) {
+        info("declaring let variable: " + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
+        lexical_environment->variables.at(Kind::Let).insert(initial_value);
       }
+      else 
+        error("Cannot declare let variable twice");
+      
       break;
     }
     case Kind::Variable: {
-      auto variables = lexical_environment->variables.at(Kind::Variable);
-      variables.insert(initial_value);
+      info("interpreting var variable declaration: " + name);
+      info("declaring var variable: " + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
+      lexical_environment->variables.at(Kind::Variable).insert(initial_value);
+
       break;
     }
     default: 
@@ -107,11 +119,20 @@ void ExpressionStatement::interpret() {
     info("Method found");
     method->interpret();
   }
+  if (auto set_variable = dynamic_cast<SetVariable*>(expression)) {
+    info("SetVariable found");
+    set_variable->interpret();
+  }
+  if (auto get_variable = dynamic_cast<GetVariable*>(expression)) {
+    info("GetVariable found");
+    get_variable->interpret();
+  }
 };
 
 /**
  * @brief Expression Interpreters 
  */
+
 any Or::interpret() {return 1;};
 any And::interpret() {return 1;};
 any Relational::interpret() {return 1;};
@@ -152,65 +173,66 @@ any GetVariable::interpret() {
     return CONSOLE;
   }
   while (lexical_environment != nullptr) {
-    auto variables = lexical_environment->variables;
     
-    auto consts = variables.at(Kind::Constant);
-    auto lets = variables.at(Kind::Let);
-    auto vars = variables.at(Kind::Variable);
-
-    auto const_iter = consts.find(name);
-    auto let_iter = lets.find(name);
-    auto var_iter = vars.find(name);
-    
-    if (const_iter != consts.end()) {
+    if (lexical_environment->variables.at(Kind::Constant).find(name) != 
+        lexical_environment->variables.at(Kind::Constant).end()) {
       info("Constant variable " + name + " found");
-      return consts.at(name).value;
-    } else if (let_iter != lets.end()) {
-      info("Let variable " + name + " found");
-      return lets.at(name).value;
-    } else if (var_iter != lets.end()) {
-      info("Var variable " + name + " found");
-      return vars.at(name).value;
+
+      return lexical_environment->variables.at(Kind::Constant).at(name).value->interpret();
+    } else if (lexical_environment->variables.at(Kind::Let).find(name) != 
+               lexical_environment->variables.at(Kind::Let).end()) {
+            info("Let variable " + name + " found");
+
+            return lexical_environment->variables.at(Kind::Let).at(name).value->interpret();
+    } else if (lexical_environment->variables.at(Kind::Variable).find(name) != 
+               lexical_environment->variables.at(Kind::Variable).end()) {
+            info("Var variable " + name + " found");
+
+            return lexical_environment->variables.at(Kind::Variable).at(name).value->interpret();
     } else {
-      info("Moving up to upper scope");
+      info("Moving up to upper scope...");
       lexical_environment = lexical_environment->upper_scope;
     }
   }
-  cout << "Cannot find variable " << name << " in scope chains. returning UNDEFINED" << endl;
-  return UNDEFINED;
+  info("Cannot find variable " + name + " in scope chains. returning UNDEFINED");
+  return Undefined{}.interpret();
 };
 any SetVariable::interpret() {
   auto allocating_value = VariableState{true, value};
   // lexical_environment가 nullptr이라는 것은 마지막 루프가 global이었다는 의미
   while (lexical_environment != nullptr) {
-    auto variables = lexical_environment->variables;
+   
+    info("attempting allocation. to: "  + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
     
-    auto consts = variables.at(Kind::Constant);
-    auto lets = variables.at(Kind::Let);
-    auto vars = variables.at(Kind::Variable);
-
-    auto const_iter = consts.find(name);
-    auto let_iter = lets.find(name);
-    auto var_iter = vars.find(name);
-    
-    if (const_iter != consts.end()) {
-      if (!consts.at(name).initialized) {
-        const_iter->second = allocating_value;
+    if (lexical_environment->variables.at(Kind::Constant).find(name) != 
+        lexical_environment->variables.at(Kind::Constant).end()) {
+      if (!lexical_environment->variables.at(Kind::Constant).at(name).initialized) {
+        lexical_environment->variables.at(Kind::Constant).find(name)->second = allocating_value;
+        info("Constant variable: " + name + " allocated");
+        break;
       } else {
         error("Constant variable can be allocated only once");
       }
-    } else if (let_iter != lets.end()) {
-      let_iter->second = allocating_value;
-    } else if (var_iter != lets.end()) {
-      var_iter->second = allocating_value;
+    } else if (lexical_environment->variables.at(Kind::Let).find(name) != 
+               lexical_environment->variables.at(Kind::Let).end()) {
+            lexical_environment->variables.at(Kind::Let).find(name)->second = allocating_value;
+            info("Let variable: " + name + " allocated");
+            break;
+    } else if (lexical_environment->variables.at(Kind::Variable).find(name) != 
+               lexical_environment->variables.at(Kind::Variable).end()) {
+            lexical_environment->variables.at(Kind::Variable).find(name)->second = allocating_value;
+            info("Var variable: " + name + " allocated");
+            break;
     } else {
+      info("moving up to upper scope...");
       lexical_environment = lexical_environment->upper_scope;
+      if (lexical_environment == nullptr) {
+        error("Cannot find predefined variable. to allocate value to a variable, a variable must have been declared");
+  }
     }
   }
         
-  if (lexical_environment == nullptr) {
-    error("Cannot find predefined variable. to allocate value to a variable, a variable must have been declared");
-  }
+  return 1;
 };
 any NullLiteral::interpret() {
   info("null literal interpreting..."); 
@@ -238,11 +260,13 @@ any Method::interpret() {
     info("method start point(GetVariable) found");
     auto this_object = get_variable->interpret();
     if (auto console = any_cast<Console*>(this_object)){
-      info("start point: console initialized");
+      info("start point: console");
       console->consoleMethod = method;
       console->arguments = arguments;
       console->interpret();
     }
   }
+
+  return 1;
 };
 

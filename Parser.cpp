@@ -137,14 +137,17 @@ vector<Statement*> parseBlock() {
       // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
       case Kind::Variable:
         skipCurrent(Kind::Variable);
+        cout << "parsing var variable" << endl;
         block.push_back(parseDeclare(new Declare(Kind::Variable)));
         break;
       case Kind::Constant:
         skipCurrent(Kind::Constant);
+        cout << "parsing const variable" << endl;
         block.push_back(parseDeclare(new Declare(Kind::Constant)));
         break;
       case Kind::Let:
         skipCurrent(Kind::Let);
+        cout << "parsing let variable" << endl;
         block.push_back(parseDeclare(new Declare(Kind::Let)));
         break;
       case Kind::EndOfToken: {
@@ -160,8 +163,10 @@ vector<Statement*> parseBlock() {
 }
 
 
-Declare* parseDeclare(Declare* declare){
+Declare* parseDeclare(Declare* declare) {
+  cout << "parsing declared variable: " << current->code << endl;
   declare->lexical_environment = current_block_scope;
+  cout << "current lexical environment: " << current_block_scope << endl;
   if (current->kind != Kind::Identifier) {
     cout << "must provide identifier when declare";
     exit(1);
@@ -210,7 +215,7 @@ Expression* parseExpression() {
 // 소비되지 않는, 그러니까 문에 포함되지 않는 식을 발견했을때 문으로 감싸기 위한 함수라는 것이다.
 // 문으로 감싸야 하는 이유는 프로그램이 '구문'을 소비하기 때문이다. Statement타입이 아니면 소비할 수 없다.
 ExpressionStatement* parseExpressionStatement() {
-  cout << "parse expression statement: " << current->code << endl;;
+  cout << "parse expression statement: " << current->code << endl;
   auto expressionStatement = new ExpressionStatement();
   expressionStatement->expression = parseExpression();
   cout << "parse complete: " << current->code << endl;
@@ -237,18 +242,23 @@ Expression* parseAssignment() {
   skipCurrent(Kind::Assignment);
 
   if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
+    cout << "allocating value to: " << get_variable->name << endl;
     auto variable_setter = new SetVariable();
+    
     variable_setter->name = get_variable->name;
     variable_setter->lexical_environment = get_variable->lexical_environment;
     variable_setter->value = parseAssignment();
+
     return variable_setter;
   }
 
   if (auto get_element = dynamic_cast<GetElement*>(parsed)) {
     auto element_setter = new SetElement();
+
     element_setter->sub = get_element->sub;
     element_setter->index = get_element->index;
     element_setter->value = parseAssignment();
+
     return element_setter;
   }
   // 원소참조도 아니고, 변수도 아니라면 불가능한 연산임
@@ -480,6 +490,7 @@ auto parseVariableOrLiterals()->Expression* {
 
   switch(current->kind) {
     case Kind::StringLiteral:{
+      cout << "string literal: " << current->code << endl;
       auto string_literal = new StringLiteral();
       string_literal->value = current->code;
       skipCurrent(Kind::StringLiteral);
@@ -497,6 +508,7 @@ auto parseVariableOrLiterals()->Expression* {
     }
 
     case Kind::Identifier:{
+      cout << "parsing identifier: " << current->code << endl;
       // 이름은 variable이지만 정확히 말하면 identifier다
       // 미리 정의된 함수의 identifier일 수도 있기 때문에 변수라는 말이 어울리지 않을 수도 있지만
       // 함수도 무조건 값으로 취급하는 js의 특성과 잘 맞는 부분이기도 하다

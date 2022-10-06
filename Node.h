@@ -20,7 +20,9 @@ using std::any;
  */
 
 // undefined
-struct Undefined {};
+struct Undefined {
+   string interpret();
+};
 // 문
 struct Statement {
   virtual void interpret() = 0;
@@ -28,6 +30,14 @@ struct Statement {
 // 식
 struct Expression {
   virtual any interpret() = 0;
+};
+
+
+
+// 변수가 초기화 되었는지의 여부와 값
+struct VariableState {
+  bool initialized;
+  Expression* value;
 };
 
 struct LexicalEnvironment {
@@ -40,10 +50,7 @@ struct LexicalEnvironment {
     {Kind::Variable, map<string, VariableState>()}
   };
 };
-struct VariableState {
-  bool initialized;
-  Expression* value;
-};
+
 // Function은 복합문이다. 그러므로 Statement를 상속받는다.
 struct Function: LexicalEnvironment, Statement {
   // 함수 이름
