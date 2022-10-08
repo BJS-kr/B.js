@@ -9,6 +9,7 @@
 using std::map;
 using std::vector;
 using std::make_pair;
+using std::stod;
 
 static auto CONSOLE = new Console();
 
@@ -86,10 +87,28 @@ void Declare::interpret() {
   // 어차피 스코프 체인을 염두에 둔다면 무엇이던 간에 블락 스코프 체인임
   // 즉, 항상 상위 스코프만 기억하면 되므로 기존의 구현을 수정할 필요가 있음
 };
-void For::interpret() {};
+void For::interpret() {
+  info("entering for loop...");
+  for (auto& node:starting_point) {
+    node->interpret();
+  }
+  info("for loop starting value interpreted");
+  while (toBool(condition->interpret())) {
+    info("looping...");
+    for (auto& node:block) {
+      node->interpret();
+    }
+    expression->interpret();
+  }
+};
 void Break::interpret() {};
 void Continue::interpret() {};
-void If::interpret() {};
+void If::interpret() {
+  auto boolean = any_cast<bool>(condition->interpret());
+  if (boolean) {
+    for (auto& node:block) node->interpret();
+  }
+};
 void Console::sequencePrint() {
     info("sequence printing started");
     for (const auto& node:arguments) {
@@ -135,7 +154,46 @@ void ExpressionStatement::interpret() {
 
 any Or::interpret() {return 1;};
 any And::interpret() {return 1;};
-any Relational::interpret() {return 1;};
+any Relational::interpret() {
+  if (kind == Kind::GreaterThan) {
+    auto l = lhs->interpret();
+    auto r = rhs->interpret();
+
+    try {
+      if (isNumber(l)) {
+        if (isNumber(r)) return toNumber(l) > toNumber(r);
+        if (isString(r)) return toNumber(l) > stod(toString(r));
+      }
+      if (isString(l)) {
+        if (isNumber(r)) return stod(toString(l)) > toNumber(r);
+        if (isString(r)) return stod(toString(l)) > stod(toString(r)); 
+      }
+    } catch(std::invalid_argument) {
+      info("comparison between non-numeric string and number always return false");
+      return false;
+    }
+    error("value comparison lhs & rhs must be one of string or number");
+  }
+  if (kind == Kind::LesserThan) {
+    auto l = lhs->interpret();
+    auto r = rhs->interpret();
+
+    try {
+      if (isNumber(l)) {
+        if (isNumber(r)) return toNumber(l) < toNumber(r);
+        if (isString(r)) return toNumber(l) < stod(toString(r));
+      }
+      if (isString(l)) {
+        if (isNumber(r)) return stod(toString(l)) < toNumber(r);
+        if (isString(r)) return stod(toString(l)) < stod(toString(r)); 
+      }
+    } catch(std::invalid_argument) {
+      info("comparison between non-numeric string and number always return false");
+      return false;
+    }
+    error("value comparison lhs & rhs must be one of string or number");
+  }
+};
 any Arithmetic::interpret() {
   auto left_value = lhs->interpret();
   auto right_value = rhs->interpret();
@@ -159,11 +217,42 @@ any Arithmetic::interpret() {
   }
   // divide
   if (kind == Kind::Divide && isNumber(left_value) && isNumber(right_value)) {
-    info("Arithmetic: multiply interpreting...");
+    info("Arithmetic: divide interpreting...");
     return toNumber(left_value) / toNumber(right_value);
   } 
 };  
-any Unary::interpret() {return 1;};
+any Unary::interpret() {
+  info("interpreting unary...");
+  if (kind == Kind::Increment) { 
+    info("unary increment found...");
+    if (auto getter = dynamic_cast<GetVariable*>(sub)) {
+      info("attempting increment to: " + getter->name);
+      auto number_1 = new NumberLiteral();
+      number_1->value = 1;
+
+      auto add_1 = new Arithmetic(Kind::Add);
+      add_1->lhs = getter;
+      add_1->rhs = number_1;
+      
+      auto added = new NumberLiteral();
+      added->value = toNumber(add_1->interpret());
+      cout << "incremented new value: " << added->value << endl;
+      auto setter = new SetVariable();
+      setter->lexical_environment = lexical_environment;
+      setter->name = getter->name;
+      setter->value = added;
+      setter->interpret();
+
+      // delete number_1;
+      // delete add_1;
+      // delete added;
+      // delete setter;
+
+      return getter->interpret();
+    } 
+
+  }
+};
 any Call::interpret() {return 1;};
 any GetElement::interpret() {return 1;};
 any SetElement::interpret() {return 1;};
@@ -197,9 +286,29 @@ any GetVariable::interpret() {
   info("Cannot find variable " + name + " in scope chains. returning UNDEFINED");
   return Undefined{}.interpret();
 };
+
+VariableState SetVariable::get_allocating_value() {
+  if (auto arithmetic = dynamic_cast<Arithmetic*>(value)) {
+    auto result = arithmetic->interpret();
+    if (isNumber(result)) {
+      auto number = new NumberLiteral();
+      number->value = toNumber(result);
+
+      return VariableState{true, number};
+    }
+    if (isString(result)) {
+      auto string = new StringLiteral();
+      string->value = toString(result);
+
+      return VariableState{true, string};
+    }
+  }
+
+  return VariableState{true, value};
+}
 any SetVariable::interpret() {
-  auto allocating_value = VariableState{true, value};
   // lexical_environment가 nullptr이라는 것은 마지막 루프가 global이었다는 의미
+
   while (lexical_environment != nullptr) {
    
     info("attempting allocation. to: "  + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
@@ -207,7 +316,7 @@ any SetVariable::interpret() {
     if (lexical_environment->variables.at(Kind::Constant).find(name) != 
         lexical_environment->variables.at(Kind::Constant).end()) {
       if (!lexical_environment->variables.at(Kind::Constant).at(name).initialized) {
-        lexical_environment->variables.at(Kind::Constant).find(name)->second = allocating_value;
+        lexical_environment->variables.at(Kind::Constant).find(name)->second = get_allocating_value();
         info("Constant variable: " + name + " allocated");
         break;
       } else {
@@ -215,12 +324,12 @@ any SetVariable::interpret() {
       }
     } else if (lexical_environment->variables.at(Kind::Let).find(name) != 
                lexical_environment->variables.at(Kind::Let).end()) {
-            lexical_environment->variables.at(Kind::Let).find(name)->second = allocating_value;
+            lexical_environment->variables.at(Kind::Let).find(name)->second = get_allocating_value();
             info("Let variable: " + name + " allocated");
             break;
     } else if (lexical_environment->variables.at(Kind::Variable).find(name) != 
                lexical_environment->variables.at(Kind::Variable).end()) {
-            lexical_environment->variables.at(Kind::Variable).find(name)->second = allocating_value;
+            lexical_environment->variables.at(Kind::Variable).find(name)->second = get_allocating_value();
             info("Var variable: " + name + " allocated");
             break;
     } else {

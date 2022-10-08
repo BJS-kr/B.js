@@ -14,6 +14,7 @@ bool isString(any);
 double toNumber(any);
 bool isNumber(any);
 string toString(any);
+bool toBool(any);
 // cout을 위한 << 연산자 오버로딩
 ostream& operator<<(ostream&, any&);
 

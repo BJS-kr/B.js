@@ -93,7 +93,7 @@ struct Declare: Statement {
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
 struct For: LexicalEnvironment, Statement {
   // for문을 위한 변수 선언(흔히 사용하는 i v등을 떠올려보자)
-  Declare* variable;
+  vector<Statement*> starting_point;
   // 조건식
   Expression* condition;
   // 증감식
@@ -114,7 +114,7 @@ struct Continue: Statement {
 
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
 struct If: LexicalEnvironment, Statement {
-  Expression* conditions;
+  Expression* condition;
   vector<Statement*> block;
   vector<Statement*> elseBlock;
   void interpret();
@@ -168,18 +168,21 @@ struct And: Expression {
  * 또 한 둘 다 이항연산자이므로 좌항과 우항을 지닌다
  */
 struct Relational: Expression {
-  Kind kind;
+  Relational(Kind kind):kind(kind) {}
   Expression* lhs;
   Expression* rhs;
   any interpret();
+  private:
+    Kind kind;
 };
 
 struct Arithmetic: Expression {
   Arithmetic(Kind kind): kind(kind){};
-  Kind kind;
   Expression* lhs;
   Expression* rhs;
   any interpret();
+  private:
+    Kind kind;
 };
 
 /**
@@ -197,6 +200,8 @@ struct Arithmetic: Expression {
 // 일단 이곳에서 사용되는 +는 absolute을 구하는데에 사용될 것이고, -는 부호반전을 위해 사용될 것이다.
 // 상술했듯이 Unary는 두 종류가 있으므로 Kind를 가진다. 단항연산자이므로 피연산자식 한 개만 가지는 것은 자명하다.
 struct Unary: Expression {
+  Unary(Kind kind):kind(kind) {};
+  LexicalEnvironment* lexical_environment;
   Kind kind;
   Expression* sub;
   any interpret();
@@ -237,10 +242,10 @@ struct GetVariable: Expression {
 
 struct SetVariable: Expression {
   LexicalEnvironment* lexical_environment;
-  Kind decl_type;
   string name;
   Expression* value;
   any interpret();
+  VariableState get_allocating_value();
 };
 
 // null의 범주는 자기 자신밖에 없으므로 interpret외에 따로 멤버를 가질 이유가 없다

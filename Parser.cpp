@@ -27,14 +27,21 @@ static auto parseAddOrSubtract()->Expression*;
 static auto parseMultiplicationOrDivide()->Expression*;
 static auto parseElementAccessOrFunctionCall()->Expression*;
 static auto parseVariableOrLiterals()->Expression*;
-static auto parseArrayLiteralOrObjectLiteral()->Expression*;
+static auto parseArrayLiteralOrObjectLiteral()->Expression*; 
 static auto parseExpression()->Expression*;
 static auto parseExpressionStatement()->ExpressionStatement*;
 static auto parseDeclare(Declare*)->Declare*;
 static auto parseParameters()->vector<string>;
+static auto parse_if()->Statement*;
+static auto parse_for()->Statement*;
+static auto parse_inner_expression()->Expression*;
 static auto parseBlock()->vector<Statement*>;
 static auto parseFunction()->Function*;
-
+static auto parse_greater_than(Expression* expr)->Expression*;
+static auto parse_lesser_than(Expression* expre)->Expression*;
+static auto parseIncrementOrDecrement()->Expression*;
+static auto parseIncrement(Expression* expr)->Expression*;
+static auto parseDecrement(Expression* expr)->Expression*;
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
 // 만약 Token의 Kind가 예상했던 것과 다르다면 bjs스크립트가 잘못 작성되었거나 컴파일러 구현 자체에 결함이 있는 것이므로 구문트리는 올바르게 생성될 수 없다.
@@ -124,6 +131,48 @@ vector<string> parseParameters() {
   return parameters;
 }
 
+Statement* parse_if() {
+  auto if_ = new If();
+  if_->upper_scope = current_block_scope;
+  current_block_scope = if_;
+  skipCurrent(Kind::If);
+  if_->condition = parse_inner_expression();
+  skipCurrent(Kind::LeftBrace);
+  if_->block = parseBlock();
+  skipCurrent(Kind::RightBrace);
+  current_block_scope = if_->upper_scope;
+
+  return if_;
+}
+
+Statement* parse_for() {
+  cout << "parsing for statement..." << endl;
+  auto for_ = new For();
+  for_->upper_scope = current_block_scope;
+  current_block_scope = for_;
+  skipCurrent(Kind::For);
+  skipCurrent(Kind::LeftParen);
+  // for문에서 조건문 변수를 선언하는 부분이다. let만 가능하도록 고정
+  // starting_point가 vector인 이유는 declare와 set variable을 두번 interpret해야하기 때문이다
+  // 즉, 할당이 for의 본문인 block에 포함되지 않아야 한다.
+  // 다만 for의 scope내 variables에는 할당되므로 연산이 가능하다
+  skipCurrent(Kind::Let);
+  for_->starting_point.push_back(parseDeclare(new Declare(Kind::Let)));
+  // 이곳에서 맡은 역할은 for의 start_point변수의 할당이다.
+  for_->starting_point.push_back(parseExpressionStatement());
+  skipCurrent(Kind::Semicolon);
+  for_->condition = parseRelational();
+  skipCurrent(Kind::Semicolon);
+  for_->expression = parseExpression();
+  skipCurrent(Kind::RightParen);
+  skipCurrent(Kind::LeftBrace);
+  for_->block = parseBlock();
+  skipCurrent(Kind::RightBrace);
+  current_block_scope = for_->upper_scope;
+
+  return for_;
+}
+
 vector<Statement*> parseBlock() {
   vector<Statement*> block;
   while (current->kind != Kind::RightBrace) {
@@ -132,9 +181,12 @@ vector<Statement*> parseBlock() {
       case Kind::Function:
         block.push_back(parseFunction());
         break;
-      // 일단은 var 키워드로 변수를 선언하는 처리만 되어있다.
-      // 향후 let과 const도 처리하려면 이곳에서 처리를 추가하면 된다.
-      // 그때 Node.h에서 Variable에 kind를 추가할지 아니면 const와 let에 해당하는 node를 따로 만들지는 고민해보자
+      case Kind::If:
+        block.push_back(parse_if());
+        break;
+      case Kind::For:
+        block.push_back(parse_for());
+        break;
       case Kind::Variable:
         skipCurrent(Kind::Variable);
         cout << "parsing var variable" << endl;
@@ -156,6 +208,7 @@ vector<Statement*> parseBlock() {
       }
       default:
         block.push_back(parseExpressionStatement());
+        skipCurrent(Kind::Semicolon);
     }
   }
 
@@ -208,6 +261,14 @@ Expression* parseExpression() {
   return parseAssignment();
 }
 
+Expression* parse_inner_expression() {
+  skipCurrent(Kind::LeftParen);
+  auto expression = parseExpression();
+  skipCurrent(Kind::RightParen);
+
+  return expression;
+}
+
 // 아래 함수는 단순히 parseExpression의 결과를 Statement로 감싸 반환하는 역할을 한다.
 // 이런 함수가 왜 필요할까? Node.h의 ExpressionStatement에도 설명해 두었지만,
 // 모든 식이 소비되는 것은 아니다.
@@ -219,7 +280,6 @@ ExpressionStatement* parseExpressionStatement() {
   auto expressionStatement = new ExpressionStatement();
   expressionStatement->expression = parseExpression();
   cout << "parse complete: " << current->code << endl;
-  skipCurrent(Kind::Semicolon);
 
   return expressionStatement;
 }
@@ -236,35 +296,52 @@ Expression* parseAssignment() {
   // a = b = 3 이라는 식을 떠올려보자. a와 b는 모두 3이 되어야 하고, 그러려면 b = 3이 먼저 평가된 후 a = b가 평가되어야 한다.
   // 그렇다면 조금 더 길게 a = b = ... z = 3이라고 생각해보자. 결국 평가되어야 하는 것은 3이다.
   // a = b를 평가하던 도중 assignment연산이 더 존재한다면 b = c를 평가하고 그 와중에 c = d를 평가되어야하고.. 결국 바닥인 3을 찍고 돌아와야한다는 것이다.
-  // 이런 식으로 조건에 따라 바닥부터 평가가 되돌아오게 하기 위하여 재귀호출하여 처리한다.
-  if (current->kind != Kind::Assignment) 
-    return parsed; // 할당연산이 아니었으므로 parsed가 무엇이던 간에 그냥 반환하면 된다.
-  skipCurrent(Kind::Assignment);
+  // 이런 식으로 조건에 따라 바닥부터 평가가 되돌아오게 하기 위하여 재귀호출하여 처리한다
+  // 할당연산이 아니었으므로 parsed가 무엇이던 간에 그냥 반환하면 된다.
+  if (skipCurrentIf(Kind::Assignment)) {
+    if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
+      cout << "allocating value to: " << get_variable->name << endl;
+      auto variable_setter = new SetVariable();
 
-  if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
-    cout << "allocating value to: " << get_variable->name << endl;
-    auto variable_setter = new SetVariable();
-    
-    variable_setter->name = get_variable->name;
-    variable_setter->lexical_environment = get_variable->lexical_environment;
-    variable_setter->value = parseAssignment();
+      variable_setter->name = get_variable->name;
+      variable_setter->lexical_environment = get_variable->lexical_environment;
+      variable_setter->value = parseAssignment();
 
-    return variable_setter;
+      return variable_setter; 
+    }
+
+    if (auto get_element = dynamic_cast<GetElement*>(parsed)) {
+      auto element_setter = new SetElement();
+
+      element_setter->sub = get_element->sub;
+      element_setter->index = get_element->index;
+      element_setter->value = parseAssignment();
+
+      return element_setter;
+    }
+    // 원소참조도 아니고, 변수도 아니라면 불가능한 연산임
+    // 그러므로, a = (3 > 4) = 6; 과 같이 적절하지 않은 연산은 이곳에서 걸러짐
+    cout << "invalid assignment attempt detected";
+    exit(1);
   }
+  if (skipCurrentIf(Kind::AddAssignment)) {
+    cout << "parsing add assignment..." << endl;
+    if (auto get_variable = dynamic_cast<GetVariable*>(parsed)) {
+      cout << "add assign to: " << get_variable->name << endl;
+      auto variable_setter = new SetVariable();
+      variable_setter->name = get_variable->name;
+      variable_setter->lexical_environment = get_variable->lexical_environment;
+      
+      auto add = new Arithmetic(Kind::Add);
+      add->lhs = get_variable;
+      add->rhs = parseAssignment();
+      
+      variable_setter->value = add;
 
-  if (auto get_element = dynamic_cast<GetElement*>(parsed)) {
-    auto element_setter = new SetElement();
-
-    element_setter->sub = get_element->sub;
-    element_setter->index = get_element->index;
-    element_setter->value = parseAssignment();
-
-    return element_setter;
+      return variable_setter;
+    }
   }
-  // 원소참조도 아니고, 변수도 아니라면 불가능한 연산임
-  // 그러므로, a = (3 > 4) = 6; 과 같이 적절하지 않은 연산은 이곳에서 걸러짐
-  cout << "invalid assignment attempt detected";
-  exit(1);
+  return parsed;
 }
 
 Expression* parseOr() {
@@ -293,8 +370,38 @@ auto parseAnd()->Expression* {
 // == === != !== > < >= <=
 auto parseRelational()->Expression* {
   auto parsed = parseAddOrSubtract();
+  if (current->kind == Kind::Equal) return {};
+  if (current->kind == Kind::StrictEqual) return {};
+  if (current->kind == Kind::NotEqual) return {};
+  if (current->kind == Kind::StrictNotEqual) return {};
+  if (current->kind == Kind::GreaterThan) return parse_greater_than(parsed);
+  if (current->kind == Kind::LesserThan) return parse_lesser_than(parsed);
+  if (current->kind == Kind::GreaterOrEqual) return {};
+  if (current->kind == Kind::LesserOrEqual) return {};
+    
   return parsed;
 }
+
+auto parse_greater_than(Expression* expr)->Expression* {
+  cout << "parsing greater than..." << endl;
+  skipCurrent(Kind::GreaterThan);
+  auto greater_than = new Relational(Kind::GreaterThan);
+  greater_than->lhs = expr;
+  greater_than->rhs = parseExpression();
+
+  return greater_than;
+}
+
+auto parse_lesser_than(Expression* expr)->Expression* {
+  skipCurrent(Kind::LesserThan);
+  auto lesser_than = new Relational(Kind::LesserThan);
+  lesser_than->lhs = expr;
+  lesser_than->rhs = parseExpression();
+
+  return lesser_than;
+}
+
+
 
 // + -
 auto parseAddOrSubtract()->Expression* {
@@ -346,7 +453,7 @@ auto parseAddOrSubtract()->Expression* {
         subtract->lhs = temp_subtract;
         subtract->rhs = parseMultiplicationOrDivide();
       } else {
-        cout <<"subtract: -" << endl;
+        cout << "subtract: -" << endl;
         auto temp_subtract = subtract;
         subtract = new Arithmetic(Kind::Subtract);
         subtract->lhs = temp_subtract;
@@ -361,7 +468,7 @@ auto parseAddOrSubtract()->Expression* {
 
 // * /
 auto parseMultiplicationOrDivide()->Expression* {
-  auto parsed = parseElementAccessOrFunctionCall();
+  auto parsed = parseIncrementOrDecrement();
   
   auto kind = current->kind;
   if (kind != Kind::Multiply && kind != Kind::Divide)
@@ -372,7 +479,7 @@ auto parseMultiplicationOrDivide()->Expression* {
     auto multiply = new Arithmetic(Kind::Multiply);
     multiply->lhs = parsed;
     skipCurrent(Kind::Multiply);
-    multiply->rhs = parseElementAccessOrFunctionCall();
+    multiply->rhs = parseIncrementOrDecrement();
 
     kind = current->kind;
     while (skipCurrentIf(Kind::Multiply) || skipCurrentIf(Kind::Divide)) {
@@ -381,13 +488,13 @@ auto parseMultiplicationOrDivide()->Expression* {
         cout << "continuous multiply detected" << endl;
         multiply = new Arithmetic(Kind::Multiply);
         multiply->lhs = temp_multiply;
-        multiply->rhs = parseElementAccessOrFunctionCall();
+        multiply->rhs = parseIncrementOrDecrement();
       }
       if (kind == Kind::Divide) {
         cout << "continuous divide detected" << endl;
         multiply = new Arithmetic(Kind::Divide);
         multiply->lhs = temp_multiply;
-        multiply->rhs = parseElementAccessOrFunctionCall();
+        multiply->rhs = parseIncrementOrDecrement();
       }
       kind = current->kind;
     }
@@ -419,6 +526,33 @@ auto parseMultiplicationOrDivide()->Expression* {
 
     return divide;
   }
+}
+
+auto parseIncrementOrDecrement()->Expression* {
+  auto parsed = parseElementAccessOrFunctionCall();
+  if (current->kind == Kind::Increment) return parseIncrement(parsed);
+  if (current->kind == Kind::Decrement) return parseDecrement(parsed);
+
+  return parsed;
+}
+
+auto parseIncrement(Expression* expr)->Expression* {
+  cout << "parsing increment..." << endl;
+  auto increment = new Unary(Kind::Increment);
+  // expr이 GetVariable이었다는 것은 increment operator가 identifier의 suffix라는 것이다.
+  if (auto get_variable = dynamic_cast<GetVariable*>(expr)) {
+    increment->sub = get_variable;
+    increment->lexical_environment = current_block_scope;
+    skipCurrent(Kind::Increment);
+    return increment;
+  } else {
+    // else 구간은 increment operator가 identifer의 prefix라는 것이다.
+  }
+
+}
+
+auto parseDecrement(Expression* expr)->Expression* {
+
 }
 
 // [] ()

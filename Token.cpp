@@ -43,14 +43,16 @@ static map<string, Kind> stringToKind = {
   {"*",           Kind::Multiply},
   {"/",           Kind::Divide},
   {"%",           Kind::Modulo},
+  {"++",          Kind::Increment},
+  {"--",          Kind::Decrement},
 
   {"===",         Kind::StrictEqual},
   {"!==",         Kind::StrictNotEqual},
   {"==",          Kind::Equal},
   {"!=",          Kind::NotEqual},
-  {"<",           Kind::LessThan},
+  {"<",           Kind::LesserThan},
   {">",           Kind::GreaterThan},
-  {"<=",          Kind::LessOrEqual},
+  {"<=",          Kind::LesserOrEqual},
   {">=",          Kind::GreaterOrEqual},
 
   {".",           Kind::Dot},

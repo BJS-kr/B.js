@@ -13,7 +13,7 @@ using std::string;
 using std::stringstream;
 
 auto info(string s) {
-    // cout << def << s << endl;
+    cout << def << s << endl;
 }
 
 auto error(string s) {

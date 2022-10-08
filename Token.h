@@ -25,9 +25,10 @@ enum class Kind {
 
   Add, Subtract,
   Multiply, Divide, Modulo,
+  Increment, Decrement,
   StrictEqual, StrictNotEqual, Equal, NotEqual,
-  LessThan, GreaterThan,
-  LessOrEqual, GreaterOrEqual,
+  LesserThan, GreaterThan,
+  LesserOrEqual, GreaterOrEqual,
 
   Dot, Comma, Colon, Semicolon,
   LeftParen, RightParen,

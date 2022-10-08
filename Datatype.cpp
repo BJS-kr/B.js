@@ -24,6 +24,10 @@ double toNumber(any value) {
   return any_cast<double>(value);
 }
 
+bool toBool(any value) {
+  return any_cast<bool>(value);
+}
+
 // cout을 위한 << 연산자 오버로딩
 // return value가 reference일 때: https://www.tutorialspoint.com/cplusplus/returning_values_by_reference.htm
 // reference value를 return 해야 insertion들을 combine할 수 있음: https://learn.microsoft.com/en-us/cpp/standard-library/overloading-the-output-operator-for-your-own-classes?view=msvc-170
