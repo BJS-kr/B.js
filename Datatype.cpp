@@ -1,4 +1,5 @@
 #include "Datatype.h"
+
 // 이곳의 함수들은 동적언어를 표방하기 위해 존재한다. 
 // 타이핑이 없는 언어는 항상 any여야하는데, 그 와중에도 연산시에는 데이터 타입이 필요하므로
 // 타입 캐스팅이 필요하다. 매번 반복되는 타입캐스팅 함수들을 이곳에 작성한 것이다.
@@ -24,6 +25,39 @@ double toNumber(any value) {
   return any_cast<double>(value);
 }
 
+bool isArray(any value) {
+  return value.type() == typeid(ArrayLiteral*);
+}
+ 
+auto toArray(any value)->ArrayLiteral* {
+  return any_cast<ArrayLiteral*>(value);
+}
+
+bool isFunctionExpression(any value) {
+  return value.type() == typeid(FunctionExpression*);
+}
+auto toFunctionExpression(any value)->FunctionExpression* {
+  return any_cast<FunctionExpression*>(value);
+}
+bool isGetVariable(any value) {
+  return value.type() == typeid(GetVariable*);
+}
+auto toGetVariable(any value)->GetVariable* {
+  return any_cast<GetVariable*>(value);
+}
+
+bool isUndefined(any value) {
+  return value.type() == typeid(Undefined*);
+}
+
+bool isConsole(any value) {
+  return value.type() == typeid(Console*);
+}
+
+auto toConsole(any value)->Console* {
+  return any_cast<Console*>(value);
+}
+
 bool toBool(any value) {
   return any_cast<bool>(value);
 }
@@ -34,6 +68,28 @@ bool toBool(any value) {
 ostream& operator<<(ostream& stream, any& value) {
   if (isString(value)) stream << toString(value);
   if (isNumber(value)) stream << toNumber(value);
+  if (isArray(value)) {
+    auto array = toArray(value);
+    string result = "[ ";
+    auto values_size = array->values.size();
+    
+    for (int i = 0; i < values_size; i++) {
+      auto element = array->values[i]->interpret();
+      result += element;
+      if (i != values_size - 1) result += ", ";
+    }
+
+    result += " ]";
+    stream << result;
+  }
+  if (isUndefined(value)) stream << "undefined";
+
   return stream;
+}
+
+string& operator+=(string& lhs, any& rhs) {
+  if (isString(rhs)) lhs += toString(rhs);
+  if (isNumber(rhs)) lhs += to_string(toNumber(rhs));
+  return lhs;
 }
 

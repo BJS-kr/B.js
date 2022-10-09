@@ -13,13 +13,16 @@ using std::stod;
 
 static auto CONSOLE = new Console();
 
-static map<string, Function*> functionTable;
+static map<string, FunctionExpression*> functionTable;
+struct ReturnException { Expression* result; };
+struct BreakException {};
+struct ContinueException {};
 
 void interpret(Program* program) {
   // 아래의 for문은 단지 program에 등록된 함수들을 모두 functionTable에 등록시키는 것이다.
   // 이렇게 처리하면 스크립트에서 어떤 순서로 함수를 작성했던지간에 상관없이 함수를 호출할 수 있게 된다.
   for (auto& node: program->functions) {
-    functionTable[node->name] = node;
+    functionTable[node->function->name] = node->function;
   }
   // nullptr이 NULL 보다 선호되는 이유: https://stackoverflow.com/questions/20509734/null-vs-nullptr-why-was-it-replaced
   // 간단히 말하자면 0으로 평가될 위험이 없음. 포인터 타입으로만 평가됨
@@ -30,19 +33,44 @@ void interpret(Program* program) {
   functionTable[GLOBAL]->interpret();
 }
 
-string Undefined::interpret() { return "undefined"; };
+any Undefined::interpret() { return this; };
 /**
  * @brief Statement Interpreters
  */
 void Function::interpret() {
   // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
-  for (auto& node: block) {
-    if (dynamic_cast<Declare*>(node)) info("Declare found");
-    if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
-    node->interpret();
-  }
+  try {
+    for (auto& node: block) {
+      if (dynamic_cast<Declare*>(node)) info("Declare found");
+      if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
+      if (dynamic_cast<Return*>(node)) info("return statement found");
+      
+      node->interpret();
+    }
+  } catch(ReturnException return_exception) {
+      throw return_exception;
+  }  
+
 };
-void Return::interpret() {};
+void Return::interpret() {
+  throw ReturnException{ expr };
+}
+void DeclareFunction::interpret() {
+  auto declare = new Declare(Kind::Variable);
+  declare->lexical_environment = function->upper_scope;
+  declare->name = function->name;
+  declare->interpret();
+
+  delete declare;
+
+  auto setter =  new SetVariable();
+  setter->lexical_environment = function->upper_scope;
+  setter->name = function->name;
+  setter->value = function;
+  setter->interpret();
+
+  delete setter;
+}
 void Declare::interpret() {
   auto initial_value = make_pair(name, VariableState{false, nullptr});
 
@@ -88,6 +116,7 @@ void Declare::interpret() {
   // 즉, 항상 상위 스코프만 기억하면 되므로 기존의 구현을 수정할 필요가 있음
 };
 void For::interpret() {
+  
   info("entering for loop...");
   for (auto& node:starting_point) {
     node->interpret();
@@ -95,14 +124,58 @@ void For::interpret() {
   info("for loop starting value interpreted");
   while (toBool(condition->interpret())) {
     info("looping...");
-    for (auto& node:block) {
-      node->interpret();
+    try {
+      for (auto& node:block) {
+        node->interpret();
+      }
+    } catch(BreakException) {
+      break;
+    } catch(ContinueException) {
+      expression->interpret();
+      continue;
     }
     expression->interpret();
+    // for loop은 매 순회마다 선언된 값들을 모두 비워줘야함
+    // 그러나 기준 변수는 기억해야함
+    // 아래는 그 과정
+    auto getter = new GetVariable();
+    getter->lexical_environment = this;
+    getter->name = starting_point_name;
+    auto value = toNumber(getter->interpret());
+
+    delete getter;
+
+    variables = {
+      {Kind::Constant, map<string, VariableState>()},
+      {Kind::Let, map<string, VariableState>()},
+      {Kind::Variable, map<string, VariableState>()}
+    };
+
+    auto declare = new Declare(Kind::Let);
+    declare->lexical_environment = this;
+    declare->name = starting_point_name;
+    declare->interpret();
+
+    delete declare;
+
+    auto number = new NumberLiteral();
+    number->value = value;
+
+    auto setter = new SetVariable();
+    setter->lexical_environment = this;
+    setter->name = starting_point_name;
+    setter->value = number;
+    setter->interpret();
+
+    delete setter;
   }
 };
-void Break::interpret() {};
-void Continue::interpret() {};
+void Break::interpret() {
+  throw BreakException{};
+};
+void Continue::interpret() {
+  throw ContinueException{};
+};
 void If::interpret() {
   auto boolean = any_cast<bool>(condition->interpret());
   if (boolean) {
@@ -116,7 +189,7 @@ void Console::sequencePrint() {
       cout << value << " ";
    }
     cout << endl;
-    info("sequenced printing ended");
+    info("sequence printing ended");
 }
 void Console::interpret() {
   // 주의할 것은, 사실 range-based for-loop에서는
@@ -128,23 +201,27 @@ void Console::interpret() {
     cout << def;
     sequencePrint();
   }
-  else if (consoleMethod == "error") {
+  if (consoleMethod == "error") {
     cout << red;
     sequencePrint();
   }
 };
 void ExpressionStatement::interpret() {
   if (auto method = dynamic_cast<Method*>(expression)) {
-    info("Method found");
+    info("Method found in ExpressionStatement");
     method->interpret();
   }
   if (auto set_variable = dynamic_cast<SetVariable*>(expression)) {
-    info("SetVariable found");
+    info("SetVariable found in ExpressionStatement");
     set_variable->interpret();
   }
   if (auto get_variable = dynamic_cast<GetVariable*>(expression)) {
-    info("GetVariable found");
+    info("GetVariable found in ExpressionStatement");
     get_variable->interpret();
+  }
+  if (auto call = dynamic_cast<Call*>(expression)) {
+    info("Call found in ExpressionStatement");
+    call->interpret();
   }
 };
 
@@ -198,15 +275,26 @@ any Arithmetic::interpret() {
   auto left_value = lhs->interpret();
   auto right_value = rhs->interpret();
 
-  // add number
-  if (kind == Kind::Add && isNumber(left_value) && isNumber(right_value)) {
+  if (kind == Kind::Add) {
     info("Arithmetic: number add interpreting...");
-    return toNumber(left_value) + toNumber(right_value);
+    if (isNumber(left_value) && isNumber(right_value)) {
+      info("Number + Number");
+      return toNumber(left_value) + toNumber(right_value);
+    }
+    if (isString(left_value) && isString(right_value)) {
+      info("String + String");
+      return toString(left_value) + toString(right_value);
+    }
+    if (isString(left_value) && isNumber(right_value)) {
+      info("String + Number");
+      return toString(left_value) + to_string(toNumber(right_value));
+    }
+    if (isNumber(left_value) && isString(right_value)) {
+      info("Number + String");
+      return to_string(toNumber(left_value)) + toString(right_value);
+    }
   } 
-  // add string
-  if (kind == Kind::Add && isString(left_value) && isString(right_value)) {
-    return toString(left_value) + toString(right_value);
-  }
+
   // subtract
   if (kind == Kind::Subtract && isNumber(left_value) && isNumber(right_value))
     return toNumber(left_value) - toNumber(right_value);
@@ -236,53 +324,172 @@ any Unary::interpret() {
       
       auto added = new NumberLiteral();
       added->value = toNumber(add_1->interpret());
-      cout << "incremented new value: " << added->value << endl;
+
       auto setter = new SetVariable();
       setter->lexical_environment = lexical_environment;
       setter->name = getter->name;
       setter->value = added;
       setter->interpret();
 
-      // delete number_1;
-      // delete add_1;
-      // delete added;
-      // delete setter;
+      delete number_1;
+      delete add_1;
+      delete setter;
 
       return getter->interpret();
     } 
 
   }
 };
-any Call::interpret() {return 1;};
-any GetElement::interpret() {return 1;};
+any Call::interpret() {
+  info("interpreting call...");
+  try {
+    if (auto method = dynamic_cast<Method*>(sub)) {
+      info("call sub is Method");
+      if (auto getter = dynamic_cast<GetVariable*>(method->this_ptr)) {
+        if (isConsole(getter->interpret())) {
+          info("console method found");
+          auto console = toConsole(getter->interpret());
+          console->arguments = arguments;
+          console->consoleMethod = method->method;
+          console->interpret();
+        }
+        if (isArray(getter->interpret())) {
+          info("array method found");
+          auto array = toArray(getter->interpret());
+          array->arguments = arguments;
+          array->array_method = method->method;
+          return array->interpret();
+        }
+      }
+      if (auto array = dynamic_cast<ArrayLiteral*>(method->this_ptr)) {
+        info("array literal method found");
+        array->arguments = arguments;
+        array->array_method = method->method;
+        return array->interpret();
+      }
+      // 사실 call이 아닐 가능성도 있지만 사양이 작은 컴파일러이므로 항상 call임을 가정한다.
+      if (auto pre_call = dynamic_cast<Call*>(method->this_ptr)) {
+        info("method chaining detected");
+        method->this_ptr = any_cast<ArrayLiteral*>(pre_call->interpret());
+        return this->interpret();
+      }
+    }
+    if (auto func_expr = dynamic_cast<FunctionExpression*>(sub)) {
+      info("call sub is FunctionExpression");
+    }
+    if (auto var_getter = dynamic_cast<GetVariable*>(sub)) {
+      info("call sub is GetVariable");
+      if (isFunctionExpression(var_getter->interpret())) {
+        auto func_expr = toFunctionExpression(var_getter->interpret());
+        for (int i = 0; i < func_expr->parameters.size(); i++) {
+          auto declare = new Declare(Kind::Variable);
+          declare->lexical_environment = func_expr;
+          declare->name = func_expr->parameters[i];
+          declare->interpret();
+          
+          delete declare;
+
+          auto setter = new SetVariable();
+          setter->lexical_environment = func_expr;
+          setter->name = func_expr->parameters[i];
+          setter->value = arguments[i];
+          setter->interpret();
+
+          delete setter;
+        }
+        func_expr->interpret();
+      }
+      
+    }
+    if (auto elem_getter = dynamic_cast<GetElement*>(sub)) {
+      info("call sub is GetElement");
+      if (isFunctionExpression(elem_getter->interpret())) {
+        auto func_expr = toFunctionExpression(elem_getter->interpret());
+        for (int i = 0; i < func_expr->parameters.size(); i++) {
+          auto declare = new Declare(Kind::Variable);
+          declare->lexical_environment = func_expr;
+          declare->name = func_expr->parameters[i];
+          declare->interpret();
+          
+          delete declare;
+
+          auto setter = new SetVariable();
+          setter->lexical_environment = func_expr;
+          setter->name = func_expr->parameters[i];
+          setter->value = arguments[i];
+          setter->interpret();
+
+          delete setter;
+        }
+        func_expr->interpret();
+      }
+    }
+  } catch(ReturnException return_exception) {
+    info("return value received after call");
+    return return_exception.result->interpret();
+  }
+
+  return Undefined{}.interpret();
+};
+any GetElement::interpret() {
+  info("GetElement interpreting...");
+  auto idx = index->interpret();
+  if (isString(idx)) {
+    info("string index found");
+    auto obj = dynamic_cast<ObjectLiteral*>(sub);
+    return obj->values[toString(idx)]->interpret();
+  }
+  if (isNumber(idx)) {
+    info("number index found");
+    auto getter = dynamic_cast<GetVariable*>(sub);
+    auto arr = any_cast<ArrayLiteral*>(getter->interpret());
+
+    return arr->values[toNumber(idx)]->interpret();
+
+  }
+};
 any SetElement::interpret() {return 1;};
 any GetVariable::interpret() {
   if (name == "console") {
     info("getting global variable: console");
     return CONSOLE;
   }
+
   while (lexical_environment != nullptr) {
-    
     if (lexical_environment->variables.at(Kind::Constant).find(name) != 
         lexical_environment->variables.at(Kind::Constant).end()) {
       info("Constant variable " + name + " found");
-
+      if (auto func_expr = dynamic_cast<FunctionExpression*>(lexical_environment->variables.at(Kind::Constant).at(name).value)) {
+        info("const variable function expression found");
+        return func_expr;
+      }
       return lexical_environment->variables.at(Kind::Constant).at(name).value->interpret();
-    } else if (lexical_environment->variables.at(Kind::Let).find(name) != 
-               lexical_environment->variables.at(Kind::Let).end()) {
-            info("Let variable " + name + " found");
-
-            return lexical_environment->variables.at(Kind::Let).at(name).value->interpret();
-    } else if (lexical_environment->variables.at(Kind::Variable).find(name) != 
-               lexical_environment->variables.at(Kind::Variable).end()) {
-            info("Var variable " + name + " found");
-
-            return lexical_environment->variables.at(Kind::Variable).at(name).value->interpret();
-    } else {
-      info("Moving up to upper scope...");
-      lexical_environment = lexical_environment->upper_scope;
     }
+
+    if (lexical_environment->variables.at(Kind::Let).find(name) != 
+        lexical_environment->variables.at(Kind::Let).end()) {
+      info("Let variable " + name + " found");
+      if (auto func_expr = dynamic_cast<FunctionExpression*>(lexical_environment->variables.at(Kind::Let).at(name).value)) {
+        info("let variable function expression found");
+        return func_expr;
+      }
+      return lexical_environment->variables.at(Kind::Let).at(name).value->interpret();
+    }
+
+    if (lexical_environment->variables.at(Kind::Variable).find(name) != 
+        lexical_environment->variables.at(Kind::Variable).end()) {
+      info("Var variable " + name + " found");
+      if (auto func_expr = dynamic_cast<FunctionExpression*>(lexical_environment->variables.at(Kind::Variable).at(name).value)) {
+        info("var variable function expression found");
+        return func_expr; 
+      }
+      return lexical_environment->variables.at(Kind::Variable).at(name).value->interpret();
+    }
+
+    info("Moving up to upper scope...");
+    lexical_environment = lexical_environment->upper_scope;
   }
+
   info("Cannot find variable " + name + " in scope chains. returning UNDEFINED");
   return Undefined{}.interpret();
 };
@@ -308,7 +515,7 @@ VariableState SetVariable::get_allocating_value() {
 }
 any SetVariable::interpret() {
   // lexical_environment가 nullptr이라는 것은 마지막 루프가 global이었다는 의미
-
+  if (dynamic_cast<Call*>(value)) info("Call* found");
   while (lexical_environment != nullptr) {
    
     info("attempting allocation. to: "  + name + ", in lexical environment: " + lexical_environment_to_string(lexical_environment));
@@ -322,34 +529,37 @@ any SetVariable::interpret() {
       } else {
         error("Constant variable can be allocated only once");
       }
-    } else if (lexical_environment->variables.at(Kind::Let).find(name) != 
-               lexical_environment->variables.at(Kind::Let).end()) {
-            lexical_environment->variables.at(Kind::Let).find(name)->second = get_allocating_value();
-            info("Let variable: " + name + " allocated");
-            break;
-    } else if (lexical_environment->variables.at(Kind::Variable).find(name) != 
-               lexical_environment->variables.at(Kind::Variable).end()) {
-            lexical_environment->variables.at(Kind::Variable).find(name)->second = get_allocating_value();
-            info("Var variable: " + name + " allocated");
-            break;
-    } else {
-      info("moving up to upper scope...");
-      lexical_environment = lexical_environment->upper_scope;
-      if (lexical_environment == nullptr) {
-        error("Cannot find predefined variable. to allocate value to a variable, a variable must have been declared");
-  }
+    }
+
+    if (lexical_environment->variables.at(Kind::Let).find(name) != 
+        lexical_environment->variables.at(Kind::Let).end()) {
+      lexical_environment->variables.at(Kind::Let).find(name)->second = get_allocating_value();
+      info("Let variable: " + name + " allocated");
+      break;
+    }
+    if (lexical_environment->variables.at(Kind::Variable).find(name) != 
+        lexical_environment->variables.at(Kind::Variable).end()) {
+      lexical_environment->variables.at(Kind::Variable).find(name)->second = get_allocating_value();
+      info("Var variable: " + name + " allocated");
+      break;
+    } 
+      
+    info("moving up to upper scope...");
+    lexical_environment = lexical_environment->upper_scope;
+    if (lexical_environment == nullptr) {
+      error("Cannot find predefined variable. to allocate value to a variable, a variable must have been declared");
     }
   }
         
-  return 1;
+  return Undefined{}.interpret();
 };
 any NullLiteral::interpret() {
   info("null literal interpreting..."); 
-  return NULL; 
+  return nullptr; 
 };
 any BooleanLiteral::interpret() { 
   info("boolean literal interpreting...");
-  return value; 
+  return boolean; 
 };
 any NumberLiteral::interpret() {
   info("number literal interpreting...");
@@ -359,23 +569,133 @@ any StringLiteral::interpret() {
   info("string literal interpreting...");
   return value;
 };
-any ArrayLiteral::interpret() {return 1;};
-any ObjectLiteral::interpret() {return 1;};
-any Method::interpret() {
-  // method객체가 아닌 getvariable객체라는 것은 메서드 체인이라고 하더라도 시작점에 도달했다는 의미
-  // 즉, 그게 무엇이 되었던 정의된 객체일 것임
-  // 메서드의 this_ptr은 언제나 literal, variable, method(메서드 체인일 경우) 밖에 없음
-  if (auto get_variable = dynamic_cast<GetVariable*>(this_ptr)) {
-    info("method start point(GetVariable) found");
-    auto this_object = get_variable->interpret();
-    if (auto console = any_cast<Console*>(this_object)){
-      info("start point: console");
-      console->consoleMethod = method;
-      console->arguments = arguments;
-      console->interpret();
+any ArrayLiteral::interpret() {
+  info("array literal interpreting...");
+  if (array_method == "map") {
+    // 특정 array객체가 마지막으로 실행되었던 메서드를 기억해서는 안된다.
+    array_method = "";
+    info("Array.map called");
+    if (!arguments.size()) error("Array.map method needs one argument at least");
+    if (auto callbackFn = dynamic_cast<FunctionExpression*>(arguments[0])) {
+
+      for (auto& param:callbackFn->parameters) {
+        auto declare = new Declare(Kind::Variable);
+        declare->lexical_environment = callbackFn;
+        declare->name = param;
+        
+        declare->interpret();
+
+        delete declare;
+      }
+
+      auto result = new ArrayLiteral();
+      for (int i = 0; i < values.size(); i++) {
+        auto setter = new SetVariable();
+        setter->lexical_environment = callbackFn;
+        setter->name = callbackFn->parameters[0];
+        setter->value = values[i];
+        setter->interpret();
+        delete setter;
+        try {
+          for (auto& node:callbackFn->block) {
+            node->interpret();
+          }
+        } catch(ReturnException return_exception) {
+          info("map callbackFn returned a value");
+          auto value = return_exception.result->interpret();
+          if (isString(value)) {
+            auto str = new StringLiteral();
+            str->value = toString(value);
+            result->values.push_back(str);
+          }
+          if (isNumber(value)) {
+            auto num = new NumberLiteral();
+            num->value = toNumber(value);
+            result->values.push_back(num);
+          } 
+        }
+      }
+      info("Array.map finished. returning new Array");
+      // FunctionExpression객체(callbackFn) 메모리 해제
+      delete arguments[0];
+      return result;
+    } else {
+      error("Array.map method's first arg must be a function");
+    }
+  } 
+  if (array_method == "reduce") {
+    array_method = "";
+    info("Array.reduce called");
+    if (!arguments.size()) error("Array.reduce method needs one argument at least");
+    if (auto callbackFn = dynamic_cast<FunctionExpression*>(arguments[0])) {
+      for (auto& param:callbackFn->parameters) {
+        auto declare = new Declare(Kind::Variable);
+        declare->lexical_environment = callbackFn;
+        declare->name = param;
+        declare->interpret();
+        delete declare;
+      }
+
+      auto initial_value = arguments[1];
+      for (int i = 0; i < values.size(); i++) {
+        auto acc = new SetVariable();
+        acc->lexical_environment = callbackFn;
+        acc->name = callbackFn->parameters[0];
+        acc->value = initial_value;
+        acc->interpret();
+        delete acc;
+
+        auto curr = new SetVariable();
+        curr->lexical_environment = callbackFn;
+        curr->name = callbackFn->parameters[1];
+        curr->value = values[i];
+        curr->interpret();
+        delete curr;
+
+        try{
+          for (auto& node:callbackFn->block) {
+            node->interpret();
+          }
+        } catch(ReturnException return_exception) {
+          info("reduce callbackFn returned a value");
+          auto value = return_exception.result->interpret();
+          if (isString(value)) {
+            auto str = new StringLiteral();
+            str->value = toString(value);
+            initial_value = str;
+          }
+          if (isNumber(value)) {
+            auto num = new NumberLiteral();
+            num->value = toNumber(value);
+            initial_value = num;
+          } 
+        }
+      }
+      return initial_value->interpret();
     }
   }
-
+  info("returning array itself...");
+    
+  return this;
+};
+any ObjectLiteral::interpret() {return 1;};
+any FunctionExpression::interpret() {
+    // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
+  try {
+    for (auto& node: block) {
+      if (dynamic_cast<Declare*>(node)) info("Declare found");
+      if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
+      if (dynamic_cast<Return*>(node)) info("return statement found");
+  
+      node->interpret();
+    }
+  } catch(ReturnException return_exception) {
+    throw return_exception;
+  }
   return 1;
 };
-
+any Method::interpret() {
+  // 메서드의 호출은 Call이 담당한다
+  // 메서드의 역할은 this_ptr등 정보를 기억하는 것 뿐이다
+  return 1;
+}

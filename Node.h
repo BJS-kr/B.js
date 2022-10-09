@@ -19,10 +19,7 @@ using std::any;
  * 결론적으로 statement는 statement과 expression을 포함할 수 있다.
  */
 
-// undefined
-struct Undefined {
-   string interpret();
-};
+
 // 문
 struct Statement {
   virtual void interpret() = 0;
@@ -31,9 +28,10 @@ struct Statement {
 struct Expression {
   virtual any interpret() = 0;
 };
-
-
-
+// undefined
+struct Undefined:Expression {
+   any interpret();
+};
 // 변수가 초기화 되었는지의 여부와 값
 struct VariableState {
   bool initialized;
@@ -52,6 +50,8 @@ struct LexicalEnvironment {
 };
 
 // Function은 복합문이다. 그러므로 Statement를 상속받는다.
+// todo: parameter들을 scope var variable로 할당해야함
+// 이 후 함수를 호출할 때 받은 arg들을 매핑
 struct Function: LexicalEnvironment, Statement {
   // 함수 이름
   string name;
@@ -63,14 +63,14 @@ struct Function: LexicalEnvironment, Statement {
   void interpret();
 };
 
-struct Program {
-  vector<Function*> functions;
-};
+
+
 
 // Return은 단일문이다. 그러므로 Statement를 상속받는다.
 struct Return: Statement {
+  Return(Expression* expr):expr(expr){};
   // Return은 단일문이다. 그러므로 다른 Statement를 가질 수 없다. 그러나 Expression은 가질 수 있다.
-  Expression* expression;
+  Expression* expr;
   void interpret();
 };
 
@@ -92,6 +92,7 @@ struct Declare: Statement {
 
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
 struct For: LexicalEnvironment, Statement {
+  string starting_point_name;
   // for문을 위한 변수 선언(흔히 사용하는 i v등을 떠올려보자)
   vector<Statement*> starting_point;
   // 조건식
@@ -167,6 +168,25 @@ struct And: Expression {
  * 그러므로 관계연산자와 산술연산자에는 이 연산자의 종류가 무엇인지를 나타내는 Kind가 포함된다.
  * 또 한 둘 다 이항연산자이므로 좌항과 우항을 지닌다
  */
+struct FunctionExpression: Expression, LexicalEnvironment {
+  string name;
+  // 파라미터들 이름
+  vector<string> parameters;
+  // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
+  vector<Statement*> block;
+  any interpret();
+};
+
+struct DeclareFunction: Statement {
+  DeclareFunction(FunctionExpression* function):function(function) {};
+  FunctionExpression* function;
+  void interpret();
+};
+
+struct Program {
+  vector<DeclareFunction*> functions;
+};
+
 struct Relational: Expression {
   Relational(Kind kind):kind(kind) {}
   Expression* lhs;
@@ -257,7 +277,8 @@ struct NullLiteral: Expression {
 // 참고로 C++의 primitive types들은 initial value가 없다. 아래의 노드들은 그러한 차이를 단적으로 보여주고 있는데,
 // bool과 double은 멤버를 명시적으로 초기화하는 반면, string은 초기값이 존재하기 때문에 초기화식이 없이 선언과 동시에 초기화가 이루어진다.
 struct BooleanLiteral: Expression {
-  bool value;
+  BooleanLiteral(bool boolean):boolean(boolean){}
+  bool boolean;
   any interpret();
 };
 
@@ -272,7 +293,9 @@ struct StringLiteral: Expression {
 };
 
 struct ArrayLiteral: Expression {
+  string array_method;
   vector<Expression*> values;
+  vector<Expression*> arguments;
   any interpret();
 };
 

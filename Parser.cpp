@@ -36,12 +36,16 @@ static auto parse_if()->Statement*;
 static auto parse_for()->Statement*;
 static auto parse_inner_expression()->Expression*;
 static auto parseBlock()->vector<Statement*>;
-static auto parseFunction()->Function*;
+static auto parseFunction()->DeclareFunction*;
 static auto parse_greater_than(Expression* expr)->Expression*;
 static auto parse_lesser_than(Expression* expre)->Expression*;
 static auto parseIncrementOrDecrement()->Expression*;
 static auto parseIncrement(Expression* expr)->Expression*;
 static auto parseDecrement(Expression* expr)->Expression*;
+static auto parse_return()->Return*;
+static auto parse_get_element(Expression* expr)->Expression*;
+static auto parse_call(Expression* expr)->Expression* ;
+static auto parse_method(Expression* expr)->Expression*;
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
 // 만약 Token의 Kind가 예상했던 것과 다르다면 bjs스크립트가 잘못 작성되었거나 컴파일러 구현 자체에 결함이 있는 것이므로 구문트리는 올바르게 생성될 수 없다.
@@ -85,8 +89,8 @@ Program* parse(vector<Token> tokens) {
 // function이라는 키워드 자체는 아무 효용이 없다. 단지 함수를 선언하겠다는 것을 알리기 위해 사용된다.
 // 그러므로 function 토큰은 버린다. 여기서 버린다는 것은 current를 한칸 전진시키는 것을 의미한다.
 // 다만 function키워드를 통해 함수 노드를 생성해야 함을 알게 되었다(구문 트리에 넣어야하니까). 그러므로 new Function한다.
-Function* parseFunction() {
-    auto function = new Function();
+DeclareFunction* parseFunction() {
+    auto function = new FunctionExpression();
     skipCurrent(Kind::Function);
     // 생성한 함수 노드에 이름을 붙여준다. function 키워드 이후에 온 함수 이름이다.
     function->name = current->code;
@@ -109,7 +113,7 @@ Function* parseFunction() {
 
     current_block_scope = function->upper_scope;
 
-    return function;
+    return new DeclareFunction(function);
   }
 
 vector<string> parseParameters() {
@@ -129,6 +133,18 @@ vector<string> parseParameters() {
   }
   
   return parameters;
+}
+
+vector<Expression*> parse_arguments() {
+  vector<Expression*> arguments;
+
+  if (current->kind != Kind::RightParen) {
+    do {
+      arguments.push_back(parseOr());
+    } while(skipCurrentIf(Kind::Comma));
+  }
+
+  return arguments;
 }
 
 Statement* parse_if() {
@@ -157,6 +173,7 @@ Statement* parse_for() {
   // 즉, 할당이 for의 본문인 block에 포함되지 않아야 한다.
   // 다만 for의 scope내 variables에는 할당되므로 연산이 가능하다
   skipCurrent(Kind::Let);
+  for_->starting_point_name = current->code;
   for_->starting_point.push_back(parseDeclare(new Declare(Kind::Let)));
   // 이곳에서 맡은 역할은 for의 start_point변수의 할당이다.
   for_->starting_point.push_back(parseExpressionStatement());
@@ -202,6 +219,19 @@ vector<Statement*> parseBlock() {
         cout << "parsing let variable" << endl;
         block.push_back(parseDeclare(new Declare(Kind::Let)));
         break;
+      case Kind::Return:
+        block.push_back(parse_return());
+        break;
+      case Kind::Break:
+        skipCurrent(Kind::Break);
+        block.push_back(new Break());
+        skipCurrent(Kind::Semicolon);
+        break;
+      case Kind::Continue:
+        skipCurrent(Kind::Continue);
+        block.push_back(new Continue());
+        skipCurrent(Kind::Semicolon);
+        break;
       case Kind::EndOfToken: {
         cout << "EndOfToken kind is not allowed to use in function block. there must be some bad implementation in compiler";
         exit(1);
@@ -213,6 +243,11 @@ vector<Statement*> parseBlock() {
   }
 
   return block;
+}
+
+auto parse_return()->Return* {
+  skipCurrent(Kind::Return);
+  return new Return(parseOr());
 }
 
 
@@ -401,8 +436,6 @@ auto parse_lesser_than(Expression* expr)->Expression* {
   return lesser_than;
 }
 
-
-
 // + -
 auto parseAddOrSubtract()->Expression* {
   auto parsed = parseMultiplicationOrDivide();
@@ -559,57 +592,80 @@ auto parseDecrement(Expression* expr)->Expression* {
 auto parseElementAccessOrFunctionCall()->Expression* {
   auto parsed = parseVariableOrLiterals();
   // 원소 접근이거나 함수호출이거나 메서드 호출이 아니라면 역할 종료
-  auto kind = current->kind;
-  if (kind != Kind::LeftBracket && kind != Kind::LeftParen && kind != Kind::Dot) 
-    return parsed;
-  
   // 원소 접근
   if (skipCurrentIf(Kind::LeftBracket)) {
-    
+    return parse_get_element(parsed);
   }
   // 함수 호출
   if (skipCurrentIf(Kind::LeftParen)) {
-
+    return parse_call(parsed);
   }
   // 메서드 호출
-  cout << "accessing method: " << current->code << endl;
-  skipCurrent(Kind::Dot);
-
-  auto method = new Method();
-
-  method->this_ptr = parsed;
-  method->method = current->code;
-  cout << "method name: " << current->code << endl;
-  skipCurrent(Kind::Identifier);
-  skipCurrent(Kind::LeftParen);
-
-  while (current->kind != Kind::RightParen) {
-    cout << "parsing method arguments..." << endl;
-    method->arguments.push_back(parseExpression());
-    skipCurrentIf(Kind::Comma);
+  if (skipCurrentIf(Kind::Dot)) {
+    return parse_method(parsed);
   }
-  skipCurrent(Kind::RightParen);
-  
-  // chained method를 검증
-  while (skipCurrentIf(Kind::Dot)) {
-    cout << "method chain detected" << endl;
-    auto temp_method = method;
-    method = new Method();
-    method->this_ptr = method;
-    method->method = current->code;
-    skipCurrent(Kind::Identifier);
-    skipCurrent(Kind::LeftParen);
 
-    while (current->kind != Kind::RightParen) {
-      cout << "parsing method arguments..." << endl;
-      method->arguments.push_back(parseExpression());
-      skipCurrentIf(Kind::Comma);
+  return parsed;
+}
+
+auto parse_get_element(Expression* expr)->Expression* {
+    cout << "parsing GetElement..." << endl;
+    auto getter = new GetElement();
+    getter->sub = expr;
+    getter->index = parseOr();
+    skipCurrent(Kind::RightBracket);
+    if (skipCurrentIf(Kind::LeftBracket)) {
+      return parse_get_element(getter);
     }
-    skipCurrent(Kind::RightParen);
-  }
-  cout << "method parsing complete: " << current->code << endl;
+    if (skipCurrentIf(Kind::LeftParen)) {
+      return parse_call(getter);
+    }
+    if (skipCurrentIf(Kind::Dot)) {
+      return parse_method(getter);
+    }
+    return getter;
+}
 
-  return method;
+auto parse_call(Expression* expr)->Expression* {
+    cout << "parsing Call..." << endl;
+    auto call = new Call();
+    call->sub = expr;
+    call->arguments = parse_arguments();
+    skipCurrent(Kind::RightParen);
+    if (skipCurrentIf(Kind::LeftBracket)) {
+      return parse_get_element(call);
+    }
+    if (skipCurrentIf(Kind::LeftParen)) {
+      return parse_call(call);
+    }
+    if (skipCurrentIf(Kind::Dot)) {
+      cout << "parsing method chain" << endl;
+      return parse_method(call);
+    }
+    return call;
+}
+
+auto parse_method(Expression* expr)->Expression* {
+    cout << "accessing method: " << current->code << endl;
+
+    auto method = new Method();
+
+    method->this_ptr = expr;
+    method->method = current->code;
+    cout << "method name: " << current->code << endl;
+    skipCurrent(Kind::Identifier);
+    
+    cout << "method parsing complete: " << current->code << endl;
+    if (skipCurrentIf(Kind::LeftBracket)) {
+      return parse_get_element(method);
+    }
+    if (skipCurrentIf(Kind::LeftParen)) {
+      return parse_call(method);
+    }
+    if (skipCurrentIf(Kind::Dot)) {
+      return parse_method(method);
+    }
+    return method;
 }
 
 // 주의: 이곳은 array literal과 object literal은 제외입니다.
@@ -655,26 +711,58 @@ auto parseVariableOrLiterals()->Expression* {
     }
 
     case Kind::TrueLiteral:{
-      break;
+      skipCurrent(Kind::TrueLiteral);
+      return new BooleanLiteral(true);
     }
     case Kind::FalseLiteral:{
-      break;
+      skipCurrent(Kind::FalseLiteral);
+      return new BooleanLiteral(false);
     }
     case Kind::NullLiteral:{
-      break;
+      skipCurrent(Kind::NullLiteral);
+      return new NullLiteral();
     }
     case Kind::UndefinedLiteral:{
-      break;
+      skipCurrent(Kind::UndefinedLiteral);
+      return new Undefined();
+    }
+    // 이 곳의 function을 parse_block의 function과 착각하면 안된다.
+    // parse_block: Statement, 이 곳: Expression
+    // 예를 들어 함수의 인자로 들어가거나 변수에 할당되는 함수들이 FunctionExpression들이다.
+    case Kind::Function:{
+      cout << "Function Expression detected: " << current->code << endl;
+      skipCurrent(Kind::Function);
+      auto function = new FunctionExpression();
+      function->upper_scope = current_block_scope;
+      current_block_scope = function;
+      // if하는 이유는 expression인 function이라도 이름을 가질 수 있기 때문
+      if (current->kind == Kind::Identifier) {
+        function->name = current->code;
+        skipCurrent(Kind::Identifier);
+      }
+      skipCurrent(Kind::LeftParen);
+      function->parameters = parseParameters();
+      skipCurrent(Kind::RightParen);
+      skipCurrent(Kind::LeftBrace);
+      function->block = parseBlock();
+      skipCurrent(Kind::RightBrace);
+
+      current_block_scope = function->upper_scope;
+
+      return function;
     }
     default:
       return parsed;
   }
 }
 
+
 // 최후순위 평가 대상: array literal과 object literal
 // array나 object내의 값은 할당이 없으므로 parseAnd부터 재귀를 돈다
 auto parseArrayLiteralOrObjectLiteral()->Expression* {
-  if (skipCurrentIf(Kind::LeftBracket)) {
+  if (current->kind == Kind::LeftBracket) {
+    cout << "Array literal found: " << current->code << endl; 
+    skipCurrent(Kind::LeftBracket);
     auto array = new ArrayLiteral();
     
     while (current->kind != Kind::RightBracket) {
@@ -689,6 +777,7 @@ auto parseArrayLiteralOrObjectLiteral()->Expression* {
   }
 
   if (skipCurrentIf(Kind::LeftBrace)) {
+
     auto object = new ObjectLiteral();
     
     while (current->kind != Kind::RightBrace) {
