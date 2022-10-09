@@ -223,6 +223,9 @@ void ExpressionStatement::interpret() {
     info("Call found in ExpressionStatement");
     call->interpret();
   }
+  if (auto set_element = dynamic_cast<SetElement*>(expression)) {
+    set_element->interpret();
+  }
 };
 
 /**
@@ -436,7 +439,9 @@ any GetElement::interpret() {
   auto idx = index->interpret();
   if (isString(idx)) {
     info("string index found");
-    auto obj = dynamic_cast<ObjectLiteral*>(sub);
+    auto getter = dynamic_cast<GetVariable*>(sub);
+    auto obj = any_cast<ObjectLiteral*>(getter->interpret());
+
     return obj->values[toString(idx)]->interpret();
   }
   if (isNumber(idx)) {
@@ -445,10 +450,19 @@ any GetElement::interpret() {
     auto arr = any_cast<ArrayLiteral*>(getter->interpret());
 
     return arr->values[toNumber(idx)]->interpret();
-
   }
 };
-any SetElement::interpret() {return 1;};
+any SetElement::interpret() {
+  
+  if (auto getter = dynamic_cast<GetVariable*>(sub)) {
+    if (isArray(getter->interpret())) {
+      auto array = toArray(getter->interpret());
+      auto idx = toNumber(index->interpret());
+      array->values[idx] = value;
+    }
+  }
+  return Undefined{}.interpret();
+};
 any GetVariable::interpret() {
   if (name == "console") {
     info("getting global variable: console");
@@ -674,11 +688,18 @@ any ArrayLiteral::interpret() {
       return initial_value->interpret();
     }
   }
+  if (array_method == "push") {
+    array_method = "";
+    for (auto& arg:arguments) {
+      values.push_back(arg);
+    }
+    return arguments.size();
+  }
   info("returning array itself...");
     
   return this;
 };
-any ObjectLiteral::interpret() {return 1;};
+any ObjectLiteral::interpret() { return this; };
 any FunctionExpression::interpret() {
     // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
   try {

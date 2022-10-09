@@ -346,6 +346,7 @@ Expression* parseAssignment() {
     }
 
     if (auto get_element = dynamic_cast<GetElement*>(parsed)) {
+      cout << "set element found" << endl;
       auto element_setter = new SetElement();
 
       element_setter->sub = get_element->sub;
@@ -777,16 +778,17 @@ auto parseArrayLiteralOrObjectLiteral()->Expression* {
   }
 
   if (skipCurrentIf(Kind::LeftBrace)) {
-
+    cout << "Object literal found" << endl;
     auto object = new ObjectLiteral();
     
     while (current->kind != Kind::RightBrace) {
       auto kind = current->kind;
+      // js와 비슷하게 따옴표 없는 숫자와 문자도 그냥 문자열로 자동 전환
       if (kind == Kind::NumberLiteral || kind == Kind::StringLiteral || kind == Kind::Identifier) {
         string key = current->code;
         skipCurrent(current->kind);
         skipCurrent(Kind::Colon);
-        Expression* value = parseAnd();
+        Expression* value = parseOr();
         object->values.insert({ key, value });
       } else {
         cout << "Object key must be number or string" << endl;
