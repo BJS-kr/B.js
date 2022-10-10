@@ -58,9 +58,9 @@ CharType getCharType(const char c) {
   // 공백, 탭, 캐리지 리턴, 개행은 일괄적으로 WhiteSpace로 처리한다.
   if (c == ' ' || c == '\t' || c == '\r' || c == '\n') 
     return CharType::WhiteSpace;
-  if (c >= '0' && c <= '9')                            
+  if (c >= '0' && c <= '9' || c == '-')                            
     return CharType::NumberLiteral;    
-  if (c == '\'')                                                
+  if (c == '\'' || c == '"')                                                
     return CharType::StringLiteral;
   if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') 
     return CharType::IdentifierAndKeyword;
@@ -87,10 +87,10 @@ bool isCharType(const char c, CharType type) {
              c >= 'A' && c <= 'Z';
       break;
     case CharType::StringLiteral:
-      return c >= 32 && c <= 126 && c != '\'';
+      return c >= 32 && c <= 126 && c != '\'' && c != '"';
       break;
     case CharType::NumberLiteral:
-      return c >= '0' && c <= '9';
+      return c >= '0' && c <= '9' || c == '-';
       break;
     case CharType::OperatorAndPunctuator:
       return c >= 33 && c <= 47 ||

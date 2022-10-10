@@ -177,7 +177,16 @@ void Continue::interpret() {
   throw ContinueException{};
 };
 void If::interpret() {
-  auto boolean = any_cast<bool>(condition->interpret());
+  info("If interpreting...");
+  if (dynamic_cast<And*>(condition)) info("If condition: And");
+  if (dynamic_cast<Or*>(condition)) info("If condition: Or");
+  if (dynamic_cast<Relational*>(condition) == nullptr) {
+    if (is_truthy(condition))
+      for (auto& node:block) node->interpret();
+    return;
+  }
+
+  auto boolean = toBool(condition->interpret());
   if (boolean) {
     for (auto& node:block) node->interpret();
   }
@@ -231,48 +240,177 @@ void ExpressionStatement::interpret() {
 /**
  * @brief Expression Interpreters 
  */
-
-any Or::interpret() {return 1;};
-any And::interpret() {return 1;};
-any Relational::interpret() {
-  if (kind == Kind::GreaterThan) {
-    auto l = lhs->interpret();
-    auto r = rhs->interpret();
-
-    try {
-      if (isNumber(l)) {
-        if (isNumber(r)) return toNumber(l) > toNumber(r);
-        if (isString(r)) return toNumber(l) > stod(toString(r));
-      }
-      if (isString(l)) {
-        if (isNumber(r)) return stod(toString(l)) > toNumber(r);
-        if (isString(r)) return stod(toString(l)) > stod(toString(r)); 
-      }
-    } catch(std::invalid_argument) {
-      info("comparison between non-numeric string and number always return false");
+bool Judge::is_truthy(Expression* expr) {
+    if (dynamic_cast<Or*>(expr)) info("jundging: Or");
+    if (dynamic_cast<And*>(expr)) info("judging: And");
+    if (expr == nullptr) return false;
+    if (auto boolean = dynamic_cast<BooleanLiteral*>(expr)) {
+      info("judging boolean");
+      return boolean->boolean;
+    };
+    if (dynamic_cast<Undefined*>(expr)) {
+      info("judging undefined");
       return false;
     }
-    error("value comparison lhs & rhs must be one of string or number");
+    if (dynamic_cast<NullLiteral*>(expr)) {
+      info("judging null");
+      return false;
+    }
+    if (auto str = dynamic_cast<StringLiteral*>(expr)) {
+      info("judging string literal");
+      auto empty_str = toString(str->interpret());
+      if (empty_str == string("")) return false; 
+    }
+    if (auto number = dynamic_cast<NumberLiteral*>(expr)) {
+      info("judging number literal");
+      if (number->value == double(0)) return false;
+    }
+    if (auto minus_zero = dynamic_cast<Arithmetic*>(expr)) {
+      info("judging minus zero(Arithmetic)");
+      if (minus_zero->lhs == nullptr && minus_zero->kind == Kind::Subtract) return false; 
+    }
+    if (auto and_ = dynamic_cast<And*>(expr)) {
+      info("nested relational: And detected");
+      if (is_truthy(and_->lhs)) return is_truthy(and_->rhs);
+      return false;
+    }
+    if (auto or_ = dynamic_cast<Or*>(expr)) {
+      info("nested relational: Or detected");
+      if (!is_truthy(or_->lhs)) return is_truthy(or_->rhs);
+      return true;
+    }
+    return true;
+}
+any Or::interpret() {
+  if (!is_truthy(lhs)) return is_truthy(rhs);
+  return true;
+};
+any And::interpret() {
+  if (is_truthy(lhs)) return is_truthy(rhs);
+  return false;
+};
+any Relational::interpret() {
+  auto l = lhs->interpret();
+  auto r = rhs->interpret();
+
+  if (kind == Kind::GreaterThan) {
+    if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) > toNumber(r);
+      if (isString(r)) return toNumber(l) > stod(toString(r));
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return stod(toString(l)) > toNumber(r);
+      if (isString(r)) return toString(l) > toString(r); 
+    }
   }
   if (kind == Kind::LesserThan) {
-    auto l = lhs->interpret();
-    auto r = rhs->interpret();
-
-    try {
-      if (isNumber(l)) {
-        if (isNumber(r)) return toNumber(l) < toNumber(r);
-        if (isString(r)) return toNumber(l) < stod(toString(r));
-      }
-      if (isString(l)) {
-        if (isNumber(r)) return stod(toString(l)) < toNumber(r);
-        if (isString(r)) return stod(toString(l)) < stod(toString(r)); 
-      }
-    } catch(std::invalid_argument) {
-      info("comparison between non-numeric string and number always return false");
+    if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) < toNumber(r);
+      if (isString(r)) return toNumber(l) < stod(toString(r));
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return stod(toString(l)) < toNumber(r);
+      if (isString(r)) return toString(l) < toString(r); 
+    }
+  }
+  if (kind == Kind::Equal) {
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) == toNumber(r);
+      if (isString(r)) return toNumber(l) == stod(toString(r));
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return stod(toString(l)) == toNumber(r);
+      if (isString(r)) return toString(l) == toString(r); 
+    }
+    if (isArray(l)) {
+      if (isArray(r)) return toArray(l) == toArray(r);
       return false;
     }
-    error("value comparison lhs & rhs must be one of string or number");
+    if (isObject(l)) {
+      if (isObject(r)) return toObject(l) == toObject(r);
+      return false;
+    } 
+  }  
+  if (kind == Kind::StrictEqual) {
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) == toNumber(r);
+      if (isString(r)) return false;
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return false;
+      if (isString(r)) return toString(l) == toString(r); 
+    }
+    if (isArray(l)) {
+      if (isArray(r)) return toArray(l) == toArray(r);
+      return false;
+    }
+    if (isObject(l)) {
+      if (isObject(r)) return toObject(l) == toObject(r);
+      return false;
+    }
   }
+  if (kind == Kind::NotEqual) {
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) != toNumber(r);
+      if (isString(r)) return toNumber(l) != stod(toString(r));
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return stod(toString(l)) != toNumber(r);
+      if (isString(r)) return toString(l) != toString(r); 
+    }
+    if (isArray(l)) {
+      if (isArray(r)) return toArray(l) != toArray(r);
+      return false;
+    }  
+    if (isObject(l)) {
+      if (isObject(r)) return toObject(l) != toObject(r);
+      return false;
+    } 
+  }
+  if (kind == Kind::StrictNotEqual) {
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) == toNumber(r);
+      if (isString(r)) return false;
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return false;
+      if (isString(r)) return toString(l) == toString(r); 
+    }
+    if (isArray(l)) {
+      if (isArray(r)) return toArray(l) == toArray(r);
+      return false;
+    }
+    if (isObject(l)) {
+      if (isObject(r)) return toObject(l) == toObject(r);
+      return false;
+    }
+  }
+  if (kind == Kind::GreaterOrEqual) {
+    if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) >= toNumber(r);
+      if (isString(r)) return toNumber(l) >= stod(toString(r));
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return stod(toString(l)) >= toNumber(r);
+      if (isString(r)) return toString(l) >= toString(r);
+    }
+  }
+  if (kind == Kind::LesserOrEqual) {
+    if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
+    if (isNumber(l)) {
+      if (isNumber(r)) return toNumber(l) <= toNumber(r);
+      if (isString(r)) return toNumber(l) <= toString(r).at(0);
+    }
+    if (isString(l)) {
+      if (isNumber(r)) return toString(l).at(0) <= toNumber(r);
+      if (isString(r)) return toString(l) <= toString(r);
+    }
+  }
+
+  return false;
 };
 any Arithmetic::interpret() {
   auto left_value = lhs->interpret();
@@ -465,7 +603,6 @@ any SetElement::interpret() {
 };
 any GetVariable::interpret() {
   if (name == "console") {
-    info("getting global variable: console");
     return CONSOLE;
   }
 

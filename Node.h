@@ -28,6 +28,9 @@ struct Statement {
 struct Expression {
   virtual any interpret() = 0;
 };
+struct Judge {
+  bool is_truthy(Expression*);
+};
 // undefined
 struct Undefined:Expression {
    any interpret();
@@ -91,7 +94,7 @@ struct Declare: Statement {
 };
 
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
-struct For: LexicalEnvironment, Statement {
+struct For: LexicalEnvironment, Statement, Judge {
   string starting_point_name;
   // for문을 위한 변수 선언(흔히 사용하는 i v등을 떠올려보자)
   vector<Statement*> starting_point;
@@ -114,7 +117,7 @@ struct Continue: Statement {
 }; 
 
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
-struct If: LexicalEnvironment, Statement {
+struct If: LexicalEnvironment, Statement, Judge {
   Expression* condition;
   vector<Statement*> block;
   vector<Statement*> elseBlock;
@@ -151,12 +154,14 @@ struct ExpressionStatement: Statement {
  * Or과 And는 이항연사자이므로 좌항과 우항을 항상 가져야한다.
  * 연산자이므로 식을 extends한다.
  */
-struct Or: Expression {
+
+
+struct Or: Expression, Judge {
   Expression* lhs;
   Expression* rhs;
   any interpret();
 };
-struct And: Expression {
+struct And: Expression, Judge {
   Expression* lhs;
   Expression* rhs;
   any interpret();
@@ -202,6 +207,7 @@ struct Arithmetic: Expression {
   Expression* rhs;
   any interpret();
   private:
+    friend Judge;
     Kind kind;
 };
 

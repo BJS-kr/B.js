@@ -33,6 +33,14 @@ auto toArray(any value)->ArrayLiteral* {
   return any_cast<ArrayLiteral*>(value);
 }
 
+bool isObject(any value) {
+  return value.type() == typeid(ObjectLiteral*);
+}
+
+auto toObject(any value)->ObjectLiteral* {
+  return any_cast<ObjectLiteral*>(value);
+}
+
 bool isFunctionExpression(any value) {
   return value.type() == typeid(FunctionExpression*);
 }
@@ -57,7 +65,9 @@ bool isConsole(any value) {
 auto toConsole(any value)->Console* {
   return any_cast<Console*>(value);
 }
-
+bool isBool(any value) {
+  return value.type() == typeid(bool);
+}
 bool toBool(any value) {
   return any_cast<bool>(value);
 }
@@ -68,17 +78,19 @@ bool toBool(any value) {
 ostream& operator<<(ostream& stream, any& value) {
   if (isString(value)) stream << toString(value);
   if (isNumber(value)) stream << toNumber(value);
+  if (isBool(value)) {
+    if (toBool(value)) stream << "true";
+    else stream << "false";
+  }
   if (isArray(value)) {
     auto array = toArray(value);
     string result = "[ ";
     auto values_size = array->values.size();
-    
     for (int i = 0; i < values_size; i++) {
       auto element = array->values[i]->interpret();
       result += element;
       if (i != values_size - 1) result += ", ";
     }
-
     result += " ]";
     stream << result;
   }

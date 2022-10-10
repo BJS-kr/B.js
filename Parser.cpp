@@ -37,6 +37,12 @@ static auto parse_for()->Statement*;
 static auto parse_inner_expression()->Expression*;
 static auto parseBlock()->vector<Statement*>;
 static auto parseFunction()->DeclareFunction*;
+static auto parse_equal(Expression*)->Expression*;
+static auto parse_strict_equal(Expression*)->Expression*;
+static auto parse_not_equal(Expression*)->Expression*;
+static auto parse_strict_not_equal(Expression*)->Expression*;
+static auto parse_greater_or_equal(Expression*)->Expression*;
+static auto parse_less_or_equal(Expression*)->Expression*;
 static auto parse_greater_than(Expression* expr)->Expression*;
 static auto parse_lesser_than(Expression* expre)->Expression*;
 static auto parseIncrementOrDecrement()->Expression*;
@@ -400,22 +406,68 @@ Expression* parseOr() {
 // &&
 auto parseAnd()->Expression* {
   auto parsed = parseRelational();
+
+  while (skipCurrentIf(Kind::LogicalAnd)) {
+    auto temp_and = new And();
+    temp_and->lhs = parsed;
+    temp_and->rhs = parseRelational();
+    parsed = temp_and;
+  }
+
   return parsed;
 }
 
 // == === != !== > < >= <=
 auto parseRelational()->Expression* {
   auto parsed = parseAddOrSubtract();
-  if (current->kind == Kind::Equal) return {};
-  if (current->kind == Kind::StrictEqual) return {};
-  if (current->kind == Kind::NotEqual) return {};
-  if (current->kind == Kind::StrictNotEqual) return {};
-  if (current->kind == Kind::GreaterThan) return parse_greater_than(parsed);
-  if (current->kind == Kind::LesserThan) return parse_lesser_than(parsed);
-  if (current->kind == Kind::GreaterOrEqual) return {};
-  if (current->kind == Kind::LesserOrEqual) return {};
+  auto kind = current->kind;
+
+  if (kind == Kind::Equal) return parse_equal(parsed);
+  if (kind == Kind::StrictEqual) return parse_strict_equal(parsed);
+  if (kind == Kind::NotEqual) return parse_not_equal(parsed);
+  if (kind == Kind::StrictNotEqual) return parse_strict_not_equal(parsed);
+  if (kind == Kind::GreaterThan) return parse_greater_than(parsed);
+  if (kind == Kind::LesserThan) return parse_lesser_than(parsed);
+  if (kind == Kind::GreaterOrEqual) return parse_greater_or_equal(parsed);
+  if (kind == Kind::LesserOrEqual) return parse_less_or_equal(parsed);
     
   return parsed;
+}
+
+auto parse_equal(Expression* expr)->Expression* {
+  cout << "parsing equal..." << endl;
+  skipCurrent(Kind::Equal);
+  auto equal = new Relational(Kind::Equal);
+  equal->lhs = expr;
+  equal->rhs = parseExpression();
+  return equal;
+} 
+
+auto parse_strict_equal(Expression* expr)->Expression* {
+  cout << "parsing strict equal..." << endl;
+  skipCurrent(Kind::StrictEqual);
+  auto strict_eqaul = new Relational(Kind::StrictEqual);
+  strict_eqaul->lhs = expr;
+  strict_eqaul->rhs = parseExpression();
+  return strict_eqaul;
+}
+
+auto parse_not_equal(Expression* expr)->Expression* {
+  cout << "parsing not equal..." << endl;
+  skipCurrent(Kind::NotEqual);
+  auto not_equal = new Relational(Kind::NotEqual);
+  not_equal->lhs = expr;
+  not_equal->rhs = parseExpression();
+  return not_equal;
+}
+
+auto parse_strict_not_equal(Expression* expr)->Expression* {
+  cout << "parsing strict not equal..." << endl;
+  skipCurrent(Kind::StrictNotEqual);
+  auto strict_not_equal = new Relational(Kind::StrictNotEqual);
+  strict_not_equal->lhs = expr;
+  strict_not_equal->rhs = parseExpression();
+  return strict_not_equal;
 }
 
 auto parse_greater_than(Expression* expr)->Expression* {
@@ -424,17 +476,34 @@ auto parse_greater_than(Expression* expr)->Expression* {
   auto greater_than = new Relational(Kind::GreaterThan);
   greater_than->lhs = expr;
   greater_than->rhs = parseExpression();
-
   return greater_than;
 }
 
 auto parse_lesser_than(Expression* expr)->Expression* {
+  cout << "parsing lesser than..." << endl;
   skipCurrent(Kind::LesserThan);
   auto lesser_than = new Relational(Kind::LesserThan);
   lesser_than->lhs = expr;
   lesser_than->rhs = parseExpression();
-
   return lesser_than;
+}
+
+auto parse_greater_or_equal(Expression* expr)->Expression* {
+  cout << "parsing greater or equal" << endl;
+  skipCurrent(Kind::GreaterOrEqual);
+  auto greater_equal = new Relational(Kind::GreaterOrEqual);
+  greater_equal->lhs = expr;
+  greater_equal->rhs = parseExpression();
+  return greater_equal;
+}
+
+auto parse_less_or_equal(Expression* expr)->Expression* {
+  cout << "parsing less or equal" << endl;
+  skipCurrent(Kind::LesserOrEqual);
+  auto less_equal = new Relational(Kind::LesserOrEqual);
+  less_equal->lhs = expr;
+  less_equal->rhs = parseExpression();
+  return less_equal;
 }
 
 // + -

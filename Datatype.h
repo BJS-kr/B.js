@@ -21,6 +21,8 @@ bool isFunctionExpression(any);
 auto toFunctionExpression(any)->FunctionExpression*;
 bool isArray(any);
 auto toArray(any)->ArrayLiteral*;
+bool isObject(any);
+auto toObject(any)->ObjectLiteral*;
 bool isConsole(any);
 auto toConsole(any)->Console*;
 bool isGetVariable(any);
