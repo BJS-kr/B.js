@@ -16,8 +16,7 @@ auto main()->int {
 
   auto tokenList = scan(sourceCode);
   auto syntaxTree = parse(tokenList);
-  interpret(syntaxTree);
-
+  auto objectCode = generate(syntaxTree);
   return 0;
 }
 

@@ -3,15 +3,14 @@
 
 #include<vector>
 #include<string>
-#include<string>
 #include<map>
-#include<any>
-#include"Token.h"
+#include "Token.h"
+#include "Code.h"
 
 using std::vector;
 using std::string;
 using std::map;
-using std::any;
+using std::tuple;
 /**
  * @brief 
  * if나 for문 등 내부에 문을 포함할 수 있으면 복합문, return 처럼 다른 문을 포함할 수 없으면 단일문이다.
@@ -22,15 +21,15 @@ using std::any;
 
 // 문
 struct Statement {
-  virtual void interpret() = 0;
+  virtual void generate() = 0;
 };
 // 식
 struct Expression {
-  virtual any interpret() = 0;
+  virtual void generate() = 0;
 };
 // undefined
 struct Undefined:Expression {
-   any interpret();
+   void generate();
 };
 // 변수가 초기화 되었는지의 여부와 값
 struct VariableState {
@@ -60,7 +59,7 @@ struct Function: LexicalEnvironment, Statement {
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
   vector<Statement*> block;
   
-  void interpret();
+  void generate();
 };
 
 
@@ -71,7 +70,7 @@ struct Return: Statement {
   Return(Expression* expr):expr(expr){};
   // Return은 단일문이다. 그러므로 다른 Statement를 가질 수 없다. 그러나 Expression은 가질 수 있다.
   Expression* expr;
-  void interpret();
+  void generate();
 };
 
 // 변수의 선언
@@ -87,7 +86,7 @@ struct Declare: Statement {
   Kind decl_type;
   // 변수 이름
   string name;
-  void interpret();
+  void generate();
 };
 
 // for 문. 변수의 선언, 조건식, 증감식, 실행할 문 리스트를 가진다.
@@ -101,16 +100,16 @@ struct For: LexicalEnvironment, Statement {
   Expression* expression;
   // for는 복합문이므로 Statement를 멤버로 가진다
   vector<Statement*> block;
-  void interpret();
+  void generate();
 };
 
 // 반복을 중지하는 break이다
 struct Break: Statement {
-  void interpret();
+  void generate();
 };
 // 다음 순서 반복을 위한 continue이다
 struct Continue: Statement {
-  void interpret();
+  void generate();
 }; 
 
 // If는 복합문이므로 다른 Statement를 멤버로 가진다
@@ -118,7 +117,7 @@ struct If: LexicalEnvironment, Statement {
   Expression* condition;
   vector<Statement*> block;
   vector<Statement*> elseBlock;
-  void interpret();
+  void generate();
 };
 
 // console
@@ -128,7 +127,7 @@ struct Console: Statement {
   string consoleMethod;
   // 출력할 식 리스트
   vector<Expression*> arguments;
-  void interpret();
+  void generate();
 };
 
 /**
@@ -143,7 +142,7 @@ struct Console: Statement {
 
 struct ExpressionStatement: Statement {
   Expression* expression;
-  void interpret();
+  void generate();
 };
 
 /**
@@ -154,12 +153,12 @@ struct ExpressionStatement: Statement {
 struct Or: Expression {
   Expression* lhs;
   Expression* rhs;
-  any interpret();
+  void generate();
 };
 struct And: Expression {
   Expression* lhs;
   Expression* rhs;
-  any interpret();
+  void generate();
 };
 
 /**
@@ -174,13 +173,13 @@ struct FunctionExpression: Expression, LexicalEnvironment {
   vector<string> parameters;
   // 함수는 if나 for와 같이 복합문이므로 block안에 다른 Statement를 가질 수 있다.
   vector<Statement*> block;
-  any interpret();
+  void generate();
 };
 
 struct DeclareFunction: Statement {
   DeclareFunction(FunctionExpression* function):function(function) {};
   FunctionExpression* function;
-  void interpret();
+  void generate();
 };
 
 struct Program {
@@ -191,7 +190,7 @@ struct Relational: Expression {
   Relational(Kind kind):kind(kind) {}
   Expression* lhs;
   Expression* rhs;
-  any interpret();
+  void generate();
   private:
     Kind kind;
 };
@@ -200,7 +199,7 @@ struct Arithmetic: Expression {
   Arithmetic(Kind kind): kind(kind){};
   Expression* lhs;
   Expression* rhs;
-  any interpret();
+  void generate();
   private:
     Kind kind;
 };
@@ -224,7 +223,7 @@ struct Unary: Expression {
   LexicalEnvironment* lexical_environment;
   Kind kind;
   Expression* sub;
-  any interpret();
+  void generate();
 };
 
 // 함수 호출 표현식
@@ -232,7 +231,7 @@ struct Unary: Expression {
 struct Call: Expression {
   Expression* sub;
   vector<Expression*> arguments;
-  any interpret();
+  void generate();
 };
 
 // 원소 참조 표현식
@@ -240,7 +239,7 @@ struct Call: Expression {
 struct GetElement: Expression {
   Expression* sub;
   Expression* index;
-  any interpret();
+  void generate();
 };
 
 // 원소 수정 표현식.
@@ -250,27 +249,27 @@ struct SetElement: Expression {
   Expression* sub;
   Expression* index;
   Expression* value;
-  any interpret();
+  void generate();
 };
 
 // 변수의 참조
 struct GetVariable: Expression {
   LexicalEnvironment* lexical_environment;
   string name;
-  any interpret();
+  void generate();
 };
 
 struct SetVariable: Expression {
   LexicalEnvironment* lexical_environment;
   string name;
   Expression* value;
-  any interpret();
+  void generate();
   VariableState get_allocating_value();
 };
 
-// null의 범주는 자기 자신밖에 없으므로 interpret외에 따로 멤버를 가질 이유가 없다
+// null의 범주는 자기 자신밖에 없으므로 generate외에 따로 멤버를 가질 이유가 없다
 struct NullLiteral: Expression {
-  any interpret();
+  void generate();
 };
 
 // boolean의 범주는 true와 false로 이루어져 있다. 그러므로 멤버가 필요하며, 기본값은 보수적으로 false로 설정한다.
@@ -279,36 +278,36 @@ struct NullLiteral: Expression {
 struct BooleanLiteral: Expression {
   BooleanLiteral(bool boolean):boolean(boolean){}
   bool boolean;
-  any interpret();
+  void generate();
 };
 
 struct NumberLiteral: Expression {
   double value;
-  any interpret();
+  void generate();
 };
 
 struct StringLiteral: Expression {
   string value;
-  any interpret();
+  void generate();
 };
 
 struct ArrayLiteral: Expression {
   string array_method;
   vector<Expression*> values;
   vector<Expression*> arguments;
-  any interpret();
+  void generate();
 };
 
 struct ObjectLiteral: Expression {
   map<string, Expression*> values;
-  any interpret();
+  void generate();
 };
 
 struct Method: Expression {
   Expression* this_ptr;
   string method;
   vector<Expression*> arguments;
-  any interpret();
+  void generate();
 };
 
 #endif
