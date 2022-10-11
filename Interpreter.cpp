@@ -304,8 +304,6 @@ any And::interpret() {
 any Relational::interpret() {
   auto l = lhs->interpret();
   auto r = rhs->interpret();
-  if (isNumber(l)) cout << toNumber(l) << endl;
-  if (isNumber(r)) cout << toNumber(r) << endl;
   if (kind == Kind::GreaterThan) {
     if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
     if (isNumber(l)) {

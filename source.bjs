@@ -1,6 +1,6 @@
-const two = -2;
-if (!two + 2) {
-    console.log("success");
+const arr = [1,2,3,4,5,6,7,8,9,10];
+const ten = 9;
+for (let i = ten; i >= 0; i--) {
+    console.log(arr[i]);
 }
-console.log(!two + 2);
 
