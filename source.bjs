@@ -1,3 +1,12 @@
-console.log('hi' + 1);
+let num = 0;
+function test(x) {
+    for (let i = 0; i < x; i++) {
+        if (i / 2 === 0) {
+            num+=i;
+        }
+    }
+}
+test(10);
+console.log(num);
 
 
