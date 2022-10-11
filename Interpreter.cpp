@@ -181,8 +181,9 @@ void If::interpret() {
   if (dynamic_cast<And*>(condition)) info("If condition: And");
   if (dynamic_cast<Or*>(condition)) info("If condition: Or");
   if (dynamic_cast<Relational*>(condition) == nullptr) {
-    if (is_truthy(condition))
+    if (is_truthy(condition)) {
       for (auto& node:block) node->interpret();
+    }
     return;
   }
 
@@ -272,7 +273,8 @@ bool Judge::is_truthy(Expression* expr) {
     }
     if (auto minus_zero = dynamic_cast<Arithmetic*>(expr)) {
       info("judging minus zero(Arithmetic)");
-      if (minus_zero->lhs == nullptr && minus_zero->kind == Kind::Subtract) return false; 
+      if (minus_zero->lhs == nullptr && minus_zero->kind == Kind::Subtract ||
+          toNumber(minus_zero->interpret()) == 0) return false; 
     }
     if (auto and_ = dynamic_cast<And*>(expr)) {
       info("nested relational: And detected");
@@ -302,7 +304,8 @@ any And::interpret() {
 any Relational::interpret() {
   auto l = lhs->interpret();
   auto r = rhs->interpret();
-
+  if (isNumber(l)) cout << toNumber(l) << endl;
+  if (isNumber(r)) cout << toNumber(r) << endl;
   if (kind == Kind::GreaterThan) {
     if (isArray(l) || isArray(r) || isObject(l) || isObject(r)) return false;
     if (isNumber(l)) {
@@ -345,7 +348,9 @@ any Relational::interpret() {
   }  
   if (kind == Kind::StrictEqual) {
     if (isNumber(l)) {
-      if (isNumber(r)) return toNumber(l) == toNumber(r);
+      if (isNumber(r)) {
+        return toNumber(l) == toNumber(r);
+      } 
       if (isString(r)) return false;
     }
     if (isString(l)) {

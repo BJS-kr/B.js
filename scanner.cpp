@@ -10,7 +10,7 @@ using std::cout;
 using std::endl;
 
 static string::iterator current;
-
+static Token lastToken;
 static auto getCharType(const char)->CharType;
 static auto isCharType(const char, CharType)->bool;
 static auto scanNumberLiteral()->Token;
@@ -30,18 +30,30 @@ auto scan(string sourceCode)->vector<Token> {
         // 공백이라면 iterator전진! 단순히 전진만 하는 이유는 공백은 말 그대로 공백. 코드 분석 이후에는 쓸모없기 때문이다.
         ++current;
         break;
-      case CharType::NumberLiteral:
-        scanned.push_back(scanNumberLiteral());
+      case CharType::NumberLiteral:{
+        auto token = scanNumberLiteral();
+        lastToken = token;
+        scanned.push_back(token);
         break;
-      case CharType::StringLiteral:
-        scanned.push_back(scanStringLiteral());
+      } 
+      case CharType::StringLiteral:{
+        auto token = scanStringLiteral();
+        lastToken = token;
+        scanned.push_back(token);
         break;
-      case CharType::IdentifierAndKeyword:
-        scanned.push_back(scanIdentifierAndKeyword());
+      }
+      case CharType::IdentifierAndKeyword:{
+        auto token = scanIdentifierAndKeyword();
+        lastToken = token;
+        scanned.push_back(token);
         break;
-      case CharType::OperatorAndPunctuator:
-        scanned.push_back(scanOperatorAndPunctuator());
+      }
+      case CharType::OperatorAndPunctuator:{
+        auto token = scanOperatorAndPunctuator();
+        lastToken = token;
+        scanned.push_back(token);
         break;
+      }
       default:
         cout << *current << "invalid source code character detected. program is shutting down" << endl;
         exit(1);
@@ -59,7 +71,12 @@ CharType getCharType(const char c) {
   if (c == ' ' || c == '\t' || c == '\r' || c == '\n') 
     return CharType::WhiteSpace;
     // --를 NumberLiteral로 해석하지 않기 위해 --가 아님을 검증한다
-  if (c >= '0' && c <= '9' || c == '-' && *(current + 1) != '-')                            
+  if (c >= '0' && c <= '9' || c == '-'      && 
+      *(current + 1) != '-'                 && 
+      lastToken.kind != Kind::NumberLiteral && 
+      lastToken.kind != Kind::Identifier    &&
+      lastToken.kind != Kind::RightParen    &&
+      lastToken.kind != Kind::RightBracket)                            
     return CharType::NumberLiteral;    
   if (c == '\'' || c == '"')                                                
     return CharType::StringLiteral;
@@ -68,9 +85,9 @@ CharType getCharType(const char c) {
   // ' 문자는 StringLiteral의 시작문자로 규정해두었으므로 제외해야 한다.
   // ASCII Code: https://theasciicode.com.ar/
   // 하단의 조건은 연산에 사용되는 특수문자들을 검증하는 것이다
-  if (c >= 33 && c <= 47 && c != '\'' ||
-      c >= 58 && c <= 64 ||
-      c >= 91 && c <= 96 ||
+  if (c >= 33  && c <= 47 && c != '\'' ||
+      c >= 58  && c <= 64              ||
+      c >= 91  && c <= 96              ||
       c >= 123 && c <= 126)
     return CharType::OperatorAndPunctuator;
   // Unknown by default
@@ -91,12 +108,15 @@ bool isCharType(const char c, CharType type) {
       return c >= 32 && c <= 126 && c != '\'' && c != '"';
       break;
     case CharType::NumberLiteral:
-      return c >= '0' && c <= '9' || c == '-';
+      return c >= '0' && c <= '9' || c == '-'                                && 
+             getCharType(*(current - 1)) != CharType::NumberLiteral          && 
+             getCharType(*(current - 1)) != CharType::IdentifierAndKeyword   &&
+             *(current - 1) != ')' && *(current - 1) != ']';
       break;
     case CharType::OperatorAndPunctuator:
-      return c >= 33 && c <= 47 ||
-             c >= 58 && c <= 64 ||
-             c >= 91 && c <= 96 ||
+      return c >= 33  && c <= 47  ||
+             c >= 58  && c <= 64  ||
+             c >= 91  && c <= 96  ||
              c >= 123 && c <= 126;
       break;
     default:

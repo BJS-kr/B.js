@@ -1,12 +1,6 @@
-let num = 0;
-function test(x) {
-    for (let i = 0; i < x; i++) {
-        if (i / 2 === 0) {
-            num+=i;
-        }
-    }
+const two = -2;
+if (!two + 2) {
+    console.log("success");
 }
-test(10);
-console.log(num);
-
+console.log(!two + 2);
 

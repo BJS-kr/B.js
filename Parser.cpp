@@ -147,7 +147,7 @@ vector<Expression*> parse_arguments() {
 
   if (current->kind != Kind::RightParen) {
     do {
-      arguments.push_back(parseOr());
+      arguments.push_back(parseNot());
     } while(skipCurrentIf(Kind::Comma));
   }
 
@@ -254,7 +254,7 @@ vector<Statement*> parseBlock() {
 
 auto parse_return()->Return* {
   skipCurrent(Kind::Return);
-  return new Return(parseOr());
+  return new Return(parseNot());
 }
 
 
@@ -697,7 +697,7 @@ auto parse_get_element(Expression* expr)->Expression* {
     cout << "parsing GetElement..." << endl;
     auto getter = new GetElement();
     getter->sub = expr;
-    getter->index = parseOr();
+    getter->index = parseNot();
     skipCurrent(Kind::RightBracket);
     if (skipCurrentIf(Kind::LeftBracket)) {
       return parse_get_element(getter);
@@ -872,7 +872,7 @@ auto parseArrayLiteralOrObjectLiteral()->Expression* {
         string key = current->code;
         skipCurrent(current->kind);
         skipCurrent(Kind::Colon);
-        Expression* value = parseOr();
+        Expression* value = parseNot();
         object->values.insert({ key, value });
       } else {
         cout << "Object key must be number or string" << endl;
