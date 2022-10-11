@@ -233,7 +233,12 @@ void ExpressionStatement::interpret() {
     call->interpret();
   }
   if (auto set_element = dynamic_cast<SetElement*>(expression)) {
+    info("SetElement found in ExpressionStatement");
     set_element->interpret();
+  }
+  if (auto unary = dynamic_cast<Unary*>(expression)){
+    info("Unary found in ExpressionStatement");
+    unary->interpret();
   }
 };
 
@@ -281,6 +286,11 @@ bool Judge::is_truthy(Expression* expr) {
     }
     return true;
 }
+
+any Not::interpret() {
+  return !is_truthy(expr);
+}
+
 any Or::interpret() {
   if (!is_truthy(lhs)) return is_truthy(rhs);
   return true;
@@ -428,11 +438,11 @@ any Arithmetic::interpret() {
     }
     if (isString(left_value) && isNumber(right_value)) {
       info("String + Number");
-      return toString(left_value) + to_string(toNumber(right_value));
+      return toString(left_value) + doubleToString(toNumber(right_value));
     }
     if (isNumber(left_value) && isString(right_value)) {
       info("Number + String");
-      return to_string(toNumber(left_value)) + toString(right_value);
+      return doubleToString(toNumber(left_value)) + toString(right_value);
     }
   } 
 
@@ -453,7 +463,7 @@ any Arithmetic::interpret() {
 any Unary::interpret() {
   info("interpreting unary...");
   if (kind == Kind::Increment) { 
-    info("unary increment found...");
+    info("unary Increment found...");
     if (auto getter = dynamic_cast<GetVariable*>(sub)) {
       info("attempting increment to: " + getter->name);
       auto number_1 = new NumberLiteral();
@@ -478,7 +488,33 @@ any Unary::interpret() {
 
       return getter->interpret();
     } 
+  }
+ if (kind == Kind::Decrement) { 
+    info("unary Decrement found...");
+    if (auto getter = dynamic_cast<GetVariable*>(sub)) {
+      info("attempting Decrement to: " + getter->name);
+      auto number_1 = new NumberLiteral();
+      number_1->value = 1;
 
+      auto subtract_1 = new Arithmetic(Kind::Subtract);
+      subtract_1->lhs = getter;
+      subtract_1->rhs = number_1;
+      
+      auto subtracted = new NumberLiteral();
+      subtracted->value = toNumber(subtract_1->interpret());
+
+      auto setter = new SetVariable();
+      setter->lexical_environment = lexical_environment;
+      setter->name = getter->name;
+      setter->value = subtracted;
+      setter->interpret();
+
+      delete number_1;
+      delete subtract_1;
+      delete setter;
+
+      return getter->interpret();
+    } 
   }
 };
 any Call::interpret() {
@@ -575,20 +611,30 @@ any Call::interpret() {
 any GetElement::interpret() {
   info("GetElement interpreting...");
   auto idx = index->interpret();
-  if (isString(idx)) {
-    info("string index found");
-    auto getter = dynamic_cast<GetVariable*>(sub);
-    auto obj = any_cast<ObjectLiteral*>(getter->interpret());
-
-    return obj->values[toString(idx)]->interpret();
+  if (auto getter = dynamic_cast<GetVariable*>(sub)) {
+    if (isObject(getter->interpret())) {
+      auto obj = toObject(getter->interpret());
+      if (isNumber(idx)) {
+        auto idx_str = doubleToString(toNumber(idx));
+        if (obj->values.find(idx_str) == obj->values.end()) return Undefined{}.interpret();
+          return obj->values[idx_str]->interpret();
+      }
+      if (isString(idx)) {
+        auto idx_str = toString(idx);
+        if (obj->values.find(idx_str) == obj->values.end()) return Undefined{}.interpret();
+          return obj->values[idx_str]->interpret();
+      }
+    }
+    if (isArray(getter->interpret())) {
+      auto arr = toArray(getter->interpret());
+      if (isNumber(idx)) {
+        auto idx_num = toNumber(idx);
+        if (idx_num > arr->values.size() - 1 || idx_num < 0) return Undefined{}.interpret();
+          return arr->values[idx_num]->interpret();
+      }
+    }
   }
-  if (isNumber(idx)) {
-    info("number index found");
-    auto getter = dynamic_cast<GetVariable*>(sub);
-    auto arr = any_cast<ArrayLiteral*>(getter->interpret());
-
-    return arr->values[toNumber(idx)]->interpret();
-  }
+  return Undefined{}.interpret();
 };
 any SetElement::interpret() {
   

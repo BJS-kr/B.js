@@ -71,6 +71,11 @@ bool isBool(any value) {
 bool toBool(any value) {
   return any_cast<bool>(value);
 }
+auto doubleToString(double num)->string {
+  stringstream ss;
+  ss << fixed << setprecision(0) << num;
+  return ss.str();
+}
 
 // cout을 위한 << 연산자 오버로딩
 // return value가 reference일 때: https://www.tutorialspoint.com/cplusplus/returning_values_by_reference.htm

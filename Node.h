@@ -155,6 +155,13 @@ struct ExpressionStatement: Statement {
  * 연산자이므로 식을 extends한다.
  */
 
+struct Not: Expression, Judge {
+  Not(Expression* expr):expr(expr) {};
+  // expr은 모든 값을 가리킨다
+  // js는 모든 값이은truthy or falsy이므로
+  Expression* expr;
+  any interpret();
+};
 
 struct Or: Expression, Judge {
   Expression* lhs;

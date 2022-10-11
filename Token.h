@@ -23,6 +23,7 @@ enum class Kind {
 
   Assignment, AddAssignment, SubtractAssignment,
 
+  Not,
   Add, Subtract,
   Multiply, Divide, Modulo,
   Increment, Decrement,

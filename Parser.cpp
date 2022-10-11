@@ -20,6 +20,7 @@ static LexicalEnvironment* current_block_scope = nullptr;
 static auto skipCurrent(Kind)->void;
 static auto skipCurrentIf(Kind)->bool;
 static auto parseAssignment()->Expression*;
+static auto parseNot()->Expression*;
 static auto parseOr()->Expression*;
 static auto parseAnd()->Expression*;
 static auto parseRelational()->Expression*;
@@ -58,7 +59,7 @@ static auto parse_method(Expression* expr)->Expression*;
 // 결론적으로 iterator를 전진시킴과 동시에 올바른 구현인지를 검증하는 함수다.
 void skipCurrent(Kind kind) {
   if (current->kind != kind) {
-    cout << "current: " << current->code << " " << "kind: " << toString(kind) << " Token kind not matches"; 
+    cout << "current: " << current->code << " " << "expected kind: " << toString(current->kind) << " " << "actual kind: " << toString(kind) << " Token kind not matches"; 
     exit(1);
   }
   ++current;
@@ -332,7 +333,7 @@ Expression* parseAssignment() {
   // 참고로 좌항이 var a, const b, let c 따위일 수는 없는데, parseBlock에서 이미 iterator를 전진시켰을 것이기 때문이다.
   // 만약 이해가 가지 않는다면 parseAssignment는 단지 parseExpression을 위해 존재하며, 연산자 우선순위가 최상단이기 때문에 parseExpression == parseAssignment인 것이고
   // 의미 전달을 위해 parseExpression으로 이름만 가지고 있다는 것을 기억하면 된다.
-  auto parsed = parseOr(); 
+  auto parsed = parseNot(); 
   // Or과 다르게 if로 검증하는 이유는 Assignment가 우결합연산이기 때문이다. 
   // a = b = 3 이라는 식을 떠올려보자. a와 b는 모두 3이 되어야 하고, 그러려면 b = 3이 먼저 평가된 후 a = b가 평가되어야 한다.
   // 그렇다면 조금 더 길게 a = b = ... z = 3이라고 생각해보자. 결국 평가되어야 하는 것은 3이다.
@@ -383,6 +384,16 @@ Expression* parseAssignment() {
       return variable_setter;
     }
   }
+  return parsed;
+}
+
+Expression* parseNot() {
+  auto parsed = parseOr();
+  if (skipCurrentIf(Kind::Not)) {
+    cout << "parsing Not" << endl;
+    return new Not(parseExpression());
+  }
+
   return parsed;
 }
 
@@ -648,14 +659,18 @@ auto parseIncrement(Expression* expr)->Expression* {
     increment->lexical_environment = current_block_scope;
     skipCurrent(Kind::Increment);
     return increment;
-  } else {
-    // else 구간은 increment operator가 identifer의 prefix라는 것이다.
   }
-
 }
 
 auto parseDecrement(Expression* expr)->Expression* {
-
+  cout << "parsing decrement..." << endl;
+  auto decrement = new Unary(Kind::Decrement);
+  if (auto get_variable = dynamic_cast<GetVariable*>(expr)) {
+    decrement->sub = get_variable;
+    decrement->lexical_environment = current_block_scope;
+    skipCurrent(Kind::Decrement);
+    return decrement;
+  }
 }
 
 // [] ()

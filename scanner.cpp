@@ -58,7 +58,8 @@ CharType getCharType(const char c) {
   // 공백, 탭, 캐리지 리턴, 개행은 일괄적으로 WhiteSpace로 처리한다.
   if (c == ' ' || c == '\t' || c == '\r' || c == '\n') 
     return CharType::WhiteSpace;
-  if (c >= '0' && c <= '9' || c == '-')                            
+    // --를 NumberLiteral로 해석하지 않기 위해 --가 아님을 검증한다
+  if (c >= '0' && c <= '9' || c == '-' && *(current + 1) != '-')                            
     return CharType::NumberLiteral;    
   if (c == '\'' || c == '"')                                                
     return CharType::StringLiteral;
