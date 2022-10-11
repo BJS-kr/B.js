@@ -426,42 +426,20 @@ any Relational::interpret() {
   return false;
 };
 any Arithmetic::interpret() {
-  auto left_value = lhs->interpret();
-  auto right_value = rhs->interpret();
+  auto l = lhs->interpret();
+  auto r = rhs->interpret();
 
   if (kind == Kind::Add) {
     info("Arithmetic: number add interpreting...");
-    if (isNumber(left_value) && isNumber(right_value)) {
-      info("Number + Number");
-      return toNumber(left_value) + toNumber(right_value);
-    }
-    if (isString(left_value) && isString(right_value)) {
-      info("String + String");
-      return toString(left_value) + toString(right_value);
-    }
-    if (isString(left_value) && isNumber(right_value)) {
-      info("String + Number");
-      return toString(left_value) + doubleToString(toNumber(right_value));
-    }
-    if (isNumber(left_value) && isString(right_value)) {
-      info("Number + String");
-      return doubleToString(toNumber(left_value)) + toString(right_value);
-    }
+    if (isNumber(l) && isNumber(r)) return toNumber(l) + toNumber(r);
+    if (isString(l) && isString(r)) return toString(l) + toString(r);
+    if (isString(l) && isNumber(r)) return toString(l) + doubleToString(toNumber(r));
+    if (isNumber(l) && isString(r)) return doubleToString(toNumber(l)) + toString(r);
   } 
-
-  // subtract
-  if (kind == Kind::Subtract && isNumber(left_value) && isNumber(right_value))
-    return toNumber(left_value) - toNumber(right_value);
-  // multiply  
-  if (kind == Kind::Multiply && isNumber(left_value) && isNumber(right_value)) {
-    info("Arithmetic: multiply interpreting...");
-    return toNumber(left_value) * toNumber(right_value);
-  }
-  // divide
-  if (kind == Kind::Divide && isNumber(left_value) && isNumber(right_value)) {
-    info("Arithmetic: divide interpreting...");
-    return toNumber(left_value) / toNumber(right_value);
-  } 
+  if (kind == Kind::Subtract && isNumber(l) && isNumber(r)) return toNumber(l) - toNumber(r);
+  if (kind == Kind::Multiply && isNumber(l) && isNumber(r)) return toNumber(l) * toNumber(r);
+  if (kind == Kind::Divide   && isNumber(l) && isNumber(r)) return toNumber(l) / toNumber(r);
+  if (kind == Kind::Modulo   && isNumber(l) && isNumber(r)) return (int)toNumber(l) % (int)toNumber(r);
 };  
 any Unary::interpret() {
   info("interpreting unary...");
