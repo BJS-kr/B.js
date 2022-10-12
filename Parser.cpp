@@ -53,6 +53,9 @@ static auto parse_return()->Return*;
 static auto parse_get_element(Expression* expr)->Expression*;
 static auto parse_call(Expression* expr)->Expression* ;
 static auto parse_method(Expression* expr)->Expression*;
+static auto parseMultiply(Expression* expr)->Expression*;
+static auto parseDivide(Expression* expr)->Expression*;
+static auto parseModulo(Expression* expr)->Expression*;
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
 // 만약 Token의 Kind가 예상했던 것과 다르다면 bjs스크립트가 잘못 작성되었거나 컴파일러 구현 자체에 결함이 있는 것이므로 구문트리는 올바르게 생성될 수 없다.
@@ -724,7 +727,6 @@ auto parseVariableOrLiterals()->Expression* {
   auto parsed = parseArrayLiteralOrObjectLiteral();
   if (parsed != nullptr) return parsed; 
   
-
   switch(current->kind) {
     case Kind::StringLiteral:{
       cout << "string literal: " << current->code << endl;
