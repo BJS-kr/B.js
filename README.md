@@ -1,9 +1,9 @@
 # B.js
-현재 브랜치는 interpreter 버전입니다. compiler 버전은 codegen 브랜치를 확인하시기 바랍니다(진행중).
-auto type이 많은 것은 단순히 가독성과 줄맞춤 때문입니다.
-camel case를 사용한 이유는 c/c++ 내장 함수와 구분짓기 위함입니다.
+현재 브랜치는 interpreter 버전입니다. compiler 버전은 codegen 브랜치를 확인하시기 바랍니다(진행중).  
+auto type이 많은 것은 단순히 가독성과 줄맞춤 때문입니다.  
+camel case를 사용한 이유는 c/c++ 내장 함수와 구분짓기 위함입니다.  
 
-모든 코드는 VS code에서 작성되었으며, c++17 기준의 코드입니다. 
+모든 코드는 VS code에서 작성되었으며, c++17 기준의 코드입니다.   
 Apple clang 14.0.0를 이용하여 컴파일 하였습니다.
 ### 직접 테스트해보고 싶으시다면
 1. source.bjs에 js코드를 작성한다.
