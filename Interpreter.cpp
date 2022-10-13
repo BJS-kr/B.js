@@ -19,15 +19,9 @@ struct BreakException {};
 struct ContinueException {};
 
 void interpret(Program* program) {
-  // 아래의 for문은 단지 program에 등록된 함수들을 모두 functionTable에 등록시키는 것이다.
-  // 이렇게 처리하면 스크립트에서 어떤 순서로 함수를 작성했던지간에 상관없이 함수를 호출할 수 있게 된다.
   for (auto& node: program->functions) {
     functionTable[node->function->name] = node->function;
   }
-  // nullptr이 NULL 보다 선호되는 이유: https://stackoverflow.com/questions/20509734/null-vs-nullptr-why-was-it-replaced
-  // 간단히 말하자면 0으로 평가될 위험이 없음. 포인터 타입으로만 평가됨
-  // 모든 함수를 functionTable에 등록한 후, main이라는 함수가 없으면 즉시 종료
-  // main이 있다면 main부터 실행하면서 main내부의 함수를 차례차례 실행하는 방식
   if (functionTable[GLOBAL] == nullptr) return;
   info("function global found, starting interpret...");
   functionTable[GLOBAL]->interpret();
@@ -38,7 +32,6 @@ any Undefined::interpret() { return this; };
  * @brief Statement Interpreters
  */
 void Function::interpret() {
-  // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
   try {
     for (auto& node: block) {
       if (dynamic_cast<Declare*>(node)) info("Declare found");
@@ -111,9 +104,6 @@ void Declare::interpret() {
     default: 
       error("Unknown declaration type detected. Declaration must be one of const, let, var");
   }
-  // if와 for의 구현에 대한 생각:
-  // 어차피 스코프 체인을 염두에 둔다면 무엇이던 간에 블락 스코프 체인임
-  // 즉, 항상 상위 스코프만 기억하면 되므로 기존의 구현을 수정할 필요가 있음
 };
 void For::interpret() {
   
@@ -137,7 +127,6 @@ void For::interpret() {
     expression->interpret();
     // for loop은 매 순회마다 선언된 값들을 모두 비워줘야함
     // 그러나 기준 변수는 기억해야함
-    // 아래는 그 과정
     auto getter = new GetVariable();
     getter->lexical_environment = this;
     getter->name = starting_point_name;
@@ -202,16 +191,12 @@ void Console::sequencePrint() {
     info("sequence printing ended");
 }
 void Console::interpret() {
-  // 주의할 것은, 사실 range-based for-loop에서는
-  // rvalue reference(ex: auto&&)가 더 일반적이라는 것이다
-  // https://stackoverflow.com/questions/25158976/forcing-auto-to-be-a-reference-type-in-a-range-for-loop
-  // 물론 &&는 일반적으로 r l value를 모두 참조할 수 있어서 좋다는 거고 아래처럼 lvalue가 확실할 때는 그냥 &로 적어도된다. 
-  if (consoleMethod == "log") {
+  if (console_method == "log") {
     info("console method: log");
     cout << def;
     sequencePrint();
   }
-  if (consoleMethod == "error") {
+  if (console_method == "error") {
     cout << red;
     sequencePrint();
   }
@@ -508,7 +493,7 @@ any Call::interpret() {
           info("console method found");
           auto console = toConsole(getter->interpret());
           console->arguments = arguments;
-          console->consoleMethod = method->method;
+          console->console_method = method->method;
           console->interpret();
         }
         if (isArray(getter->interpret())) {

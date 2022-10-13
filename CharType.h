@@ -3,6 +3,7 @@
 
 enum class CharType {
   Unknown,
+  Notation,
   WhiteSpace,
   NumberLiteral,
   StringLiteral,

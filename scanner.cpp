@@ -11,6 +11,7 @@ using std::endl;
 
 static string::iterator current;
 static Token lastToken;
+
 static auto getCharType(const char)->CharType;
 static auto isCharType(const char, CharType)->bool;
 static auto scanNumberLiteral()->Token;
@@ -55,7 +56,7 @@ auto scan(string sourceCode)->vector<Token> {
         break;
       }
       default:
-        cout << *current << "invalid source code character detected. program is shutting down" << endl;
+        cout << *current << "invalid source code character detected. program is shutting down";      
         exit(1);
     }
   }

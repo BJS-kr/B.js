@@ -17,45 +17,45 @@ using std::stod;
 static vector<Token>::iterator current;
 static LexicalEnvironment* current_block_scope = nullptr;
 // auto는 자명한 타입추론 뿐 아니라 함수 줄 맞춤에도 큰 효과가 있는 것 같다. 엄청 깔끔해보인다 :)
-static auto skipCurrent(Kind)->void;
-static auto skipCurrentIf(Kind)->bool;
-static auto parseAssignment()->Expression*;
-static auto parseNot()->Expression*;
-static auto parseOr()->Expression*;
-static auto parseAnd()->Expression*;
-static auto parseRelational()->Expression*;
-static auto parseAddOrSubtract()->Expression*;
+static auto parseAssignment()                    ->Expression*;
+static auto parseNot()                           ->Expression*;
+static auto parseOr()                            ->Expression*;
+static auto parseAnd()                           ->Expression*;
+static auto parseRelational()                    ->Expression*;
+static auto parseAddOrSubtract()                 ->Expression*;
 static auto parseMultiplicationOrDivideOrModulo()->Expression*;
-static auto parseElementAccessOrFunctionCall()->Expression*;
-static auto parseVariableOrLiterals()->Expression*;
-static auto parseArrayLiteralOrObjectLiteral()->Expression*; 
-static auto parseExpression()->Expression*;
-static auto parseExpressionStatement()->ExpressionStatement*;
-static auto parseDeclare(Declare*)->Declare*;
-static auto parseParameters()->vector<string>;
-static auto parse_if()->Statement*;
-static auto parse_for()->Statement*;
-static auto parse_inner_expression()->Expression*;
-static auto parseBlock()->vector<Statement*>;
-static auto parseFunction()->DeclareFunction*;
-static auto parse_equal(Expression*)->Expression*;
-static auto parse_strict_equal(Expression*)->Expression*;
-static auto parse_not_equal(Expression*)->Expression*;
-static auto parse_strict_not_equal(Expression*)->Expression*;
-static auto parse_greater_or_equal(Expression*)->Expression*;
-static auto parse_less_or_equal(Expression*)->Expression*;
-static auto parse_greater_than(Expression* expr)->Expression*;
-static auto parse_lesser_than(Expression* expre)->Expression*;
-static auto parseIncrementOrDecrement()->Expression*;
-static auto parseIncrement(Expression* expr)->Expression*;
-static auto parseDecrement(Expression* expr)->Expression*;
-static auto parse_return()->Return*;
-static auto parse_get_element(Expression* expr)->Expression*;
-static auto parse_call(Expression* expr)->Expression* ;
-static auto parse_method(Expression* expr)->Expression*;
-static auto parseMultiply(Expression* expr)->Expression*;
-static auto parseDivide(Expression* expr)->Expression*;
-static auto parseModulo(Expression* expr)->Expression*;
+static auto parseElementAccessOrFunctionCall()   ->Expression*;
+static auto parseVariableOrLiterals()            ->Expression*;
+static auto parseArrayLiteralOrObjectLiteral()   ->Expression*; 
+static auto parseExpression()                    ->Expression*;
+static auto parseInnerExpression()               ->Expression*;
+static auto parseEqual(Expression*)              ->Expression*;
+static auto parseStrictEqual(Expression*)        ->Expression*;
+static auto parseNotEqual(Expression*)           ->Expression*;
+static auto parseStrictNotEqual(Expression*)     ->Expression*;
+static auto parseGreaterOrEqual(Expression*)     ->Expression*;
+static auto parseLessOrEqual(Expression*)        ->Expression*;
+static auto parseGreaterThan(Expression* expr)   ->Expression*;
+static auto parseLesserThan(Expression* expre)   ->Expression*;
+static auto parseIncrementOrDecrement()          ->Expression*;
+static auto parseIncrement(Expression* expr)     ->Expression*;
+static auto parseDecrement(Expression* expr)     ->Expression*;
+static auto parseGetElement(Expression* expr)    ->Expression*;
+static auto parseCall(Expression* expr)          ->Expression*;
+static auto parseMethod(Expression* expr)        ->Expression*;
+static auto parseMultiply(Expression* expr)      ->Expression*;
+static auto parseDivide(Expression* expr)        ->Expression*;
+static auto parseModulo(Expression* expr)        ->Expression*;
+static auto parseExpressionStatement()           ->ExpressionStatement*;
+static auto parseDeclare(Declare*)               ->Declare*;
+static auto parseFunction()                      ->DeclareFunction*;
+static auto parseReturn()                        ->Return*;
+static auto parseIf()                            ->Statement*;
+static auto parseFor()                           ->Statement*;
+static auto parseBlock()                         ->vector<Statement*>;
+static auto parseParameters()                    ->vector<string>;
+static auto skipCurrent(Kind)                    ->void;
+static auto skipCurrentIf(Kind)                  ->bool;
 // 이 함수는 current iterator를 전진시키기 위한 것으로
 // 인자가 필요한 이유는 현재 논리상 마땅한 Token의 Kind가 일치하는지를 검증해야하기 때문이다.
 // 만약 Token의 Kind가 예상했던 것과 다르다면 bjs스크립트가 잘못 작성되었거나 컴파일러 구현 자체에 결함이 있는 것이므로 구문트리는 올바르게 생성될 수 없다.
@@ -84,7 +84,6 @@ Program* parse(vector<Token> tokens) {
     switch (current->kind) {
       case Kind::Function:
         // static으로 선언된 current를 참조하므로 parseFunction에는 인자가 필요하지 않다.
-        // 이런 접근 방식을 맘에 들어하지 않을 수도 있겠지만 편리한건 사실이다. 다만 함수형적인 측면으로 봤을 땐 참 그렇다.
         program->functions.push_back(parseFunction());
         break;
       default:
@@ -101,23 +100,20 @@ Program* parse(vector<Token> tokens) {
 // 다만 function키워드를 통해 함수 노드를 생성해야 함을 알게 되었다(구문 트리에 넣어야하니까). 그러므로 new Function한다.
 DeclareFunction* parseFunction() {
     auto function = new FunctionExpression();
+    // 선언
     skipCurrent(Kind::Function);
-    // 생성한 함수 노드에 이름을 붙여준다. function 키워드 이후에 온 함수 이름이다.
+    // 이름
     function->name = current->code;
+    // 스코프 확정
     function->upper_scope = current_block_scope;
     current_block_scope = function;
-    // 함수건 변수건 이름은 식별자이다. 식별자로 판단되지 않았으면 에러이므로 skipCurrent함수로 검사해준다.
     skipCurrent(Kind::Identifier);
-    // 함수의 식별자 다음엔 매개 변수들이 위치할 것이다. 매개 변수는 좌괄호로 시작하므로
-    // 좌괄호를 생략한 후, 우괄호를 만나기 전까지 쉼표를 생략하며 수집하면 될 것이다.
-    // 리마인드하자면, 빈 칸을 검사하지 않은 이유는 scan할때 이미 공백을 모두 생략한 토큰 리스트를 만들기 때문이다.
     skipCurrent(Kind::LeftParen);
+    // 인자
     function->parameters = parseParameters();
     skipCurrent(Kind::RightParen);
-
-    // 다음은 함수의 본문이다
-    // 함수의 본문은 중괄호로 시작한다. 본문 내용에 도달하기 위해 생략한다.
     skipCurrent(Kind::LeftBrace);
+    // 본문
     function->block = parseBlock();
     skipCurrent(Kind::RightBrace);
 
@@ -128,24 +124,19 @@ DeclareFunction* parseFunction() {
 
 vector<string> parseParameters() {
   vector<string> parameters;
-
   if (current->kind != Kind::RightParen) {
-      // do-while을 사용하는 이유는 do를 통해 무조건 1번 이상의 실행을 보장받아야하기 때문이다. while을 썼다면 내용은 전혀 실행되지 못하고 넘어갔을 것이다.
+      // do-while을 사용하는 이유는 do를 통해 무조건 1번 이상의 실행을 보장받아야하기 때문이다. 
+      // while을 썼다면 내용은 전혀 실행되지 못하고 넘어갔을 것이다.
       do {
         parameters.push_back(current->code);
         skipCurrent(Kind::Identifier);
-        // 1. 식별자 하나를 parameters에 넣는다
-        // 2. 다음 토큰이 Comma라면 그 다음 param이 존재한다고 확신할 수 있다
-        // 3. 그러므로 skipCurrentIf는 true를 반환하고 루프를 끝내지 않는다
-        // 4. 다음 토큰이 Comma가 아니라면 params를 모두 수집했다고 볼 수 있다.
-        // 5. 그러므로 skipCurrentIf는 false를 반환하고 루프를 끝낸다.
       } while(skipCurrentIf(Kind::Comma));
   }
   
   return parameters;
 }
 
-vector<Expression*> parse_arguments() {
+vector<Expression*> parseArguments() {
   vector<Expression*> arguments;
 
   if (current->kind != Kind::RightParen) {
@@ -157,12 +148,12 @@ vector<Expression*> parse_arguments() {
   return arguments;
 }
 
-Statement* parse_if() {
+Statement* parseIf() {
   auto if_ = new If();
   if_->upper_scope = current_block_scope;
   current_block_scope = if_;
   skipCurrent(Kind::If);
-  if_->condition = parse_inner_expression();
+  if_->condition = parseInnerExpression();
   skipCurrent(Kind::LeftBrace);
   if_->block = parseBlock();
   skipCurrent(Kind::RightBrace);
@@ -171,7 +162,7 @@ Statement* parse_if() {
   return if_;
 }
 
-Statement* parse_for() {
+Statement* parseFor() {
   cout << "parsing for statement..." << endl;
   auto for_ = new For();
   for_->upper_scope = current_block_scope;
@@ -209,10 +200,10 @@ vector<Statement*> parseBlock() {
         block.push_back(parseFunction());
         break;
       case Kind::If:
-        block.push_back(parse_if());
+        block.push_back(parseIf());
         break;
       case Kind::For:
-        block.push_back(parse_for());
+        block.push_back(parseFor());
         break;
       case Kind::Variable:
         skipCurrent(Kind::Variable);
@@ -230,7 +221,7 @@ vector<Statement*> parseBlock() {
         block.push_back(parseDeclare(new Declare(Kind::Let)));
         break;
       case Kind::Return:
-        block.push_back(parse_return());
+        block.push_back(parseReturn());
         break;
       case Kind::Break:
         skipCurrent(Kind::Break);
@@ -255,7 +246,7 @@ vector<Statement*> parseBlock() {
   return block;
 }
 
-auto parse_return()->Return* {
+auto parseReturn()->Return* {
   skipCurrent(Kind::Return);
   return new Return(parseNot());
 }
@@ -306,7 +297,7 @@ Expression* parseExpression() {
   return parseAssignment();
 }
 
-Expression* parse_inner_expression() {
+Expression* parseInnerExpression() {
   skipCurrent(Kind::LeftParen);
   auto expression = parseExpression();
   skipCurrent(Kind::RightParen);
@@ -436,19 +427,19 @@ auto parseRelational()->Expression* {
   auto parsed = parseAddOrSubtract();
   auto kind = current->kind;
 
-  if (kind == Kind::Equal)          return parse_equal(parsed);
-  if (kind == Kind::StrictEqual)    return parse_strict_equal(parsed);
-  if (kind == Kind::NotEqual)       return parse_not_equal(parsed);
-  if (kind == Kind::StrictNotEqual) return parse_strict_not_equal(parsed);
-  if (kind == Kind::GreaterThan)    return parse_greater_than(parsed);
-  if (kind == Kind::LesserThan)     return parse_lesser_than(parsed);
-  if (kind == Kind::GreaterOrEqual) return parse_greater_or_equal(parsed);
-  if (kind == Kind::LesserOrEqual)  return parse_less_or_equal(parsed);
+  if (kind == Kind::Equal)          return parseEqual(parsed);
+  if (kind == Kind::StrictEqual)    return parseStrictEqual(parsed);
+  if (kind == Kind::NotEqual)       return parseNotEqual(parsed);
+  if (kind == Kind::StrictNotEqual) return parseStrictNotEqual(parsed);
+  if (kind == Kind::GreaterThan)    return parseGreaterThan(parsed);
+  if (kind == Kind::LesserThan)     return parseLesserThan(parsed);
+  if (kind == Kind::GreaterOrEqual) return parseGreaterOrEqual(parsed);
+  if (kind == Kind::LesserOrEqual)  return parseLessOrEqual(parsed);
     
   return parsed;
 }
 
-auto parse_equal(Expression* expr)->Expression* {
+auto parseEqual(Expression* expr)->Expression* {
   cout << "parsing equal..." << endl;
   skipCurrent(Kind::Equal);
   auto equal = new Relational(Kind::Equal);
@@ -457,7 +448,7 @@ auto parse_equal(Expression* expr)->Expression* {
   return equal;
 } 
 
-auto parse_strict_equal(Expression* expr)->Expression* {
+auto parseStrictEqual(Expression* expr)->Expression* {
   cout << "parsing strict equal..." << endl;
   skipCurrent(Kind::StrictEqual);
   auto strict_eqaul = new Relational(Kind::StrictEqual);
@@ -466,7 +457,7 @@ auto parse_strict_equal(Expression* expr)->Expression* {
   return strict_eqaul;
 }
 
-auto parse_not_equal(Expression* expr)->Expression* {
+auto parseNotEqual(Expression* expr)->Expression* {
   cout << "parsing not equal..." << endl;
   skipCurrent(Kind::NotEqual);
   auto not_equal = new Relational(Kind::NotEqual);
@@ -475,7 +466,7 @@ auto parse_not_equal(Expression* expr)->Expression* {
   return not_equal;
 }
 
-auto parse_strict_not_equal(Expression* expr)->Expression* {
+auto parseStrictNotEqual(Expression* expr)->Expression* {
   cout << "parsing strict not equal..." << endl;
   skipCurrent(Kind::StrictNotEqual);
   auto strict_not_equal = new Relational(Kind::StrictNotEqual);
@@ -484,7 +475,7 @@ auto parse_strict_not_equal(Expression* expr)->Expression* {
   return strict_not_equal;
 }
 
-auto parse_greater_than(Expression* expr)->Expression* {
+auto parseGreaterThan(Expression* expr)->Expression* {
   cout << "parsing greater than..." << endl;
   skipCurrent(Kind::GreaterThan);
   auto greater_than = new Relational(Kind::GreaterThan);
@@ -493,7 +484,7 @@ auto parse_greater_than(Expression* expr)->Expression* {
   return greater_than;
 }
 
-auto parse_lesser_than(Expression* expr)->Expression* {
+auto parseLesserThan(Expression* expr)->Expression* {
   cout << "parsing lesser than..." << endl;
   skipCurrent(Kind::LesserThan);
   auto lesser_than = new Relational(Kind::LesserThan);
@@ -502,7 +493,7 @@ auto parse_lesser_than(Expression* expr)->Expression* {
   return lesser_than;
 }
 
-auto parse_greater_or_equal(Expression* expr)->Expression* {
+auto parseGreaterOrEqual(Expression* expr)->Expression* {
   cout << "parsing greater or equal" << endl;
   skipCurrent(Kind::GreaterOrEqual);
   auto greater_equal = new Relational(Kind::GreaterOrEqual);
@@ -511,7 +502,7 @@ auto parse_greater_or_equal(Expression* expr)->Expression* {
   return greater_equal;
 }
 
-auto parse_less_or_equal(Expression* expr)->Expression* {
+auto parseLessOrEqual(Expression* expr)->Expression* {
   cout << "parsing less or equal" << endl;
   skipCurrent(Kind::LesserOrEqual);
   auto less_equal = new Relational(Kind::LesserOrEqual);
@@ -665,42 +656,42 @@ auto parseDecrement(Expression* expr)->Expression* {
 auto parseElementAccessOrFunctionCall()->Expression* {
   auto parsed = parseVariableOrLiterals();
 
-  if (skipCurrentIf(Kind::LeftBracket)) return parse_get_element(parsed);
-  if (skipCurrentIf(Kind::LeftParen))   return parse_call(parsed);
-  if (skipCurrentIf(Kind::Dot))         return parse_method(parsed);
+  if (skipCurrentIf(Kind::LeftBracket)) return parseGetElement(parsed);
+  if (skipCurrentIf(Kind::LeftParen))   return parseCall(parsed);
+  if (skipCurrentIf(Kind::Dot))         return parseMethod(parsed);
   
   return parsed;
 }
 
-auto parse_get_element(Expression* expr)->Expression* {
+auto parseGetElement(Expression* expr)->Expression* {
     cout << "parsing GetElement..." << endl;
     auto getter = new GetElement();
     getter->sub = expr;
     getter->index = parseNot();
     skipCurrent(Kind::RightBracket);
     
-    if (skipCurrentIf(Kind::LeftBracket)) return parse_get_element(getter);
-    if (skipCurrentIf(Kind::LeftParen))   return parse_call(getter);
-    if (skipCurrentIf(Kind::Dot))         return parse_method(getter);
+    if (skipCurrentIf(Kind::LeftBracket)) return parseGetElement(getter);
+    if (skipCurrentIf(Kind::LeftParen))   return parseCall(getter);
+    if (skipCurrentIf(Kind::Dot))         return parseMethod(getter);
     
     return getter;
 }
 
-auto parse_call(Expression* expr)->Expression* {
+auto parseCall(Expression* expr)->Expression* {
     cout << "parsing Call..." << endl;
     auto call = new Call();
     call->sub = expr;
-    call->arguments = parse_arguments();
+    call->arguments = parseArguments();
     skipCurrent(Kind::RightParen);
 
-    if (skipCurrentIf(Kind::LeftBracket)) return parse_get_element(call);
-    if (skipCurrentIf(Kind::LeftParen))   return parse_call(call);
-    if (skipCurrentIf(Kind::Dot))         return parse_method(call);
+    if (skipCurrentIf(Kind::LeftBracket)) return parseGetElement(call);
+    if (skipCurrentIf(Kind::LeftParen))   return parseCall(call);
+    if (skipCurrentIf(Kind::Dot))         return parseMethod(call);
     
     return call;
 }
 
-auto parse_method(Expression* expr)->Expression* {
+auto parseMethod(Expression* expr)->Expression* {
     cout << "accessing method: " << current->code << endl;
 
     auto method = new Method();
@@ -711,9 +702,9 @@ auto parse_method(Expression* expr)->Expression* {
     skipCurrent(Kind::Identifier);
     
     cout << "method parsing complete: " << current->code << endl;
-    if (skipCurrentIf(Kind::LeftBracket)) return parse_get_element(method);
-    if (skipCurrentIf(Kind::LeftParen))   return parse_call(method);
-    if (skipCurrentIf(Kind::Dot))         return parse_method(method);
+    if (skipCurrentIf(Kind::LeftBracket)) return parseGetElement(method);
+    if (skipCurrentIf(Kind::LeftParen))   return parseCall(method);
+    if (skipCurrentIf(Kind::Dot))         return parseMethod(method);
     
     return method;
 }

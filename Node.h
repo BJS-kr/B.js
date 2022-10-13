@@ -19,7 +19,6 @@ using std::any;
  * 결론적으로 statement는 statement과 expression을 포함할 수 있다.
  */
 
-
 // 문
 struct Statement {
   virtual void interpret() = 0;
@@ -128,7 +127,7 @@ struct If: LexicalEnvironment, Statement, Judge {
 struct Console: Statement {
   void sequencePrint();
   // 개행 여부를 표현한다. 기본값 false이다
-  string consoleMethod;
+  string console_method;
   // 출력할 식 리스트
   vector<Expression*> arguments;
   void interpret();
