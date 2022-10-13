@@ -9,9 +9,13 @@ auto generate(Program* program)->tuple<vector<Code>, map<string, size_t>> {
     // global함수는 인자가 0개다
     write_code(Instruction::Call, static_cast<size_t>(0));
     write_code(Instruction::Exit);
-    for (auto& node:program->functions) {
-        node->generate();
-    }
+    // program에는 항상 하나의 DeclareFunction만 존재하며, 그 값은 global FunctionExpression이다.
+    // 모든 함수를 FunctionExpression으로 가정하는 이유는 js의 함수는 모두 값으로 취급되기 때문이다.
+    // global함수는 사실 DeclareFunction으로 평가될 필요는 없으나, 모든 함수 선언을 동일하게 취급하기위하여 
+    // global함수도 DeclareFunction으로 감싼후, 실제로 할당하지는 않은 채 그 내용을 즉시 실행한다.
+    // 아래의 코드는 위의 설명이 표현된 것이다.
+    program->functions[0]->function->generate();
+    
     return {code_list, function_table};
 }
 
@@ -28,7 +32,9 @@ auto write_code(Instruction instruction, any operand)->size_t {
 /**
  * @brief Statement
  * */
+// B.js에서는 모든 Function은 FunctionExpression이다. 그러므로 아래의 Statement를 상송한 Function은 사실상 사용될 일이 없다.
 auto Function::generate()->void {
+    // Function sturct를 generate할때 function table에 name prop으로 codelist의 size를 매핑
     // 함수의 이름과 주소(인덱스)를 매핑한다.6
     function_table[name] = code_list.size();
     // 함수를 실행한다
@@ -57,10 +63,15 @@ auto If::generate()->void {
 
 }
 auto Console::generate()->void {
-    for (auto i = arguments.size(); i > 0; i--) {
-        arguments[i - 1]->generate();
+    if (consoleMethod == "log") {
+        // 거꾸로 삽입하는 이유
+        // 예를 들어, 1과 2를 출력한다고 가정해보자. 그렇다면 아래의 반복문은 2와 1순서로 넣는 것이다.
+        // 이는 선형인 바이트코드 생성과 콜스택에서 기인하는데, log가 피연산자 스택을 사용하므로 맞는 순서로 스택 소비하는 순서는 반대가 된다.
+        for (auto i = arguments.size(); i > 0; i--) {
+            arguments[i - 1]->generate();
+        }
+        write_code(Instruction::Log, arguments.size());
     }
-    write_code(Instruction::Console, arguments.size());
 }
 auto ExpressionStatement::generate()->void {
     expression->generate();

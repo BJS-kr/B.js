@@ -1,7 +1,1 @@
-function test(x) {
-    return 4 + x;
-}
-const obj = { 1: 1, two:2, 'three':3, four:test};
-console.log(obj['1'] + obj['two'] + obj['three']);
-console.log(obj['four'](10));
-
+console.log(1);
