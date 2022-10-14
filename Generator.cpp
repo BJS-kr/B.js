@@ -48,7 +48,9 @@ auto Return::generate()->void {
 
 }
 auto Declare::generate()->void {
-
+    if (decl_type == Kind::Variable) {
+        write_code(Instruction::Var, name);
+    }
 }
 auto For::generate()->void {
 
@@ -63,7 +65,7 @@ auto If::generate()->void {
 
 }
 auto Console::generate()->void {
-    if (consoleMethod == "log") {
+    if (console_method == "log") {
         // 거꾸로 삽입하는 이유
         // 예를 들어, 1과 2를 출력한다고 가정해보자. 그렇다면 아래의 반복문은 2와 1순서로 넣는 것이다.
         // 이는 선형인 바이트코드 생성과 콜스택에서 기인하는데, log가 피연산자 스택을 사용하므로 맞는 순서로 스택 소비하는 순서는 반대가 된다.
@@ -72,6 +74,11 @@ auto Console::generate()->void {
         }
         write_code(Instruction::Log, arguments.size());
     }
+    if (console_method == "error") {
+
+    }
+    cout << "invalid console method";
+    exit(1);
 }
 auto ExpressionStatement::generate()->void {
     expression->generate();

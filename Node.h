@@ -124,7 +124,7 @@ struct If: LexicalEnvironment, Statement {
 struct Console: Statement {
   void sequencePrint();
   // 개행 여부를 표현한다. 기본값 false이다
-  string consoleMethod;
+  string console_method;
   // 출력할 식 리스트
   vector<Expression*> arguments;
   void generate();

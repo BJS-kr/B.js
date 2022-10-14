@@ -7,7 +7,7 @@ using std::any;
 
 enum class Instruction {
     Exit, 
-    Call, Alloc, Return,
+    Call, Alloc, Var, Let, Const, Return,
     Jump, ConditionJump,
     Log,
 
