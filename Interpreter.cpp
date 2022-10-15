@@ -172,6 +172,8 @@ void If::interpret() {
   if (dynamic_cast<Relational*>(condition) == nullptr) {
     if (is_truthy(condition)) {
       for (auto& node:block) node->interpret();
+    } else {
+      for (auto& node:else_block) node->interpret();
     }
     return;
   }
@@ -179,6 +181,8 @@ void If::interpret() {
   auto boolean = toBool(condition->interpret());
   if (boolean) {
     for (auto& node:block) node->interpret();
+  } else {
+    for (auto& node:else_block) node->interpret();
   }
 };
 void Console::sequencePrint() {

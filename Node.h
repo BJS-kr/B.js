@@ -119,7 +119,7 @@ struct Continue: Statement {
 struct If: LexicalEnvironment, Statement, Judge {
   Expression* condition;
   vector<Statement*> block;
-  vector<Statement*> elseBlock;
+  vector<Statement*> else_block;
   void interpret();
 };
 

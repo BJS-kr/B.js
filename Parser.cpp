@@ -159,6 +159,12 @@ Statement* parseIf() {
   skipCurrent(Kind::RightBrace);
   current_block_scope = if_->upper_scope;
 
+  if (skipCurrentIf(Kind::Else)) {
+    skipCurrent(Kind::LeftBrace);
+    if_->else_block = parseBlock();
+    skipCurrent(Kind::RightBrace);
+  }
+
   return if_;
 }
 
