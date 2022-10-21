@@ -12,12 +12,12 @@ using std::endl;
 static string::iterator current;
 static Token lastToken;
 
-static auto getCharType(const char)->CharType;
+static auto getCharType(const char)         ->CharType;
 static auto isCharType(const char, CharType)->bool;
-static auto scanNumberLiteral()->Token;
-static auto scanStringLiteral()->Token;
-static auto scanIdentifierAndKeyword()->Token;
-static auto scanOperatorAndPunctuator()->Token;
+static auto scanNumberLiteral()             ->Token;
+static auto scanStringLiteral()             ->Token;
+static auto scanIdentifierAndKeyword()      ->Token;
+static auto scanOperatorAndPunctuator()     ->Token;
 
 auto scan(string sourceCode)->vector<Token> {
   vector<Token> scanned;

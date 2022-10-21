@@ -28,7 +28,7 @@ struct Expression {
   virtual any interpret() = 0;
 };
 struct Judge {
-  bool is_truthy(Expression*);
+  bool isTruthy(Expression*);
 };
 // undefined
 struct Undefined:Expression {
@@ -277,7 +277,7 @@ struct SetVariable: Expression {
   string name;
   Expression* value;
   any interpret();
-  VariableState get_allocating_value();
+  VariableState getAllocatingValue();
 };
 
 // null의 범주는 자기 자신밖에 없으므로 interpret외에 따로 멤버를 가질 이유가 없다

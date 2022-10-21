@@ -34,10 +34,6 @@ any Undefined::interpret() { return this; };
 void Function::interpret() {
   try {
     for (auto& node: block) {
-      if (dynamic_cast<Declare*>(node)) info("Declare found");
-      if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
-      if (dynamic_cast<Return*>(node)) info("return statement found");
-      
       node->interpret();
     }
   } catch(ReturnException return_exception) {
@@ -167,10 +163,8 @@ void Continue::interpret() {
 };
 void If::interpret() {
   info("If interpreting...");
-  if (dynamic_cast<And*>(condition)) info("If condition: And");
-  if (dynamic_cast<Or*>(condition)) info("If condition: Or");
   if (dynamic_cast<Relational*>(condition) == nullptr) {
-    if (is_truthy(condition)) {
+    if (isTruthy(condition)) {
       for (auto& node:block) node->interpret();
     } else {
       for (auto& node:else_block) node->interpret();
@@ -235,7 +229,7 @@ void ExpressionStatement::interpret() {
 /**
  * @brief Expression Interpreters 
  */
-bool Judge::is_truthy(Expression* expr) {
+bool Judge::isTruthy(Expression* expr) {
     if (dynamic_cast<Or*>(expr)) info("jundging: Or");
     if (dynamic_cast<And*>(expr)) info("judging: And");
     if (expr == nullptr) return false;
@@ -267,27 +261,27 @@ bool Judge::is_truthy(Expression* expr) {
     }
     if (auto and_ = dynamic_cast<And*>(expr)) {
       info("nested relational: And detected");
-      if (is_truthy(and_->lhs)) return is_truthy(and_->rhs);
+      if (isTruthy(and_->lhs)) return isTruthy(and_->rhs);
       return false;
     }
     if (auto or_ = dynamic_cast<Or*>(expr)) {
       info("nested relational: Or detected");
-      if (!is_truthy(or_->lhs)) return is_truthy(or_->rhs);
+      if (!isTruthy(or_->lhs)) return isTruthy(or_->rhs);
       return true;
     }
     return true;
 }
 
 any Not::interpret() {
-  return !is_truthy(expr);
+  return !isTruthy(expr);
 }
 
 any Or::interpret() {
-  if (!is_truthy(lhs)) return is_truthy(rhs);
+  if (!isTruthy(lhs)) return isTruthy(rhs);
   return true;
 };
 any And::interpret() {
-  if (is_truthy(lhs)) return is_truthy(rhs);
+  if (isTruthy(lhs)) return isTruthy(rhs);
   return false;
 };
 any Relational::interpret() {
@@ -661,7 +655,7 @@ any GetVariable::interpret() {
   return Undefined{}.interpret();
 };
 
-VariableState SetVariable::get_allocating_value() {
+VariableState SetVariable::getAllocatingValue() {
   if (auto arithmetic = dynamic_cast<Arithmetic*>(value)) {
     auto result = arithmetic->interpret();
     if (isNumber(result)) {
@@ -690,7 +684,7 @@ any SetVariable::interpret() {
     if (lexical_environment->variables.at(Kind::Constant).find(name) != 
         lexical_environment->variables.at(Kind::Constant).end()) {
       if (!lexical_environment->variables.at(Kind::Constant).at(name).initialized) {
-        lexical_environment->variables.at(Kind::Constant).find(name)->second = get_allocating_value();
+        lexical_environment->variables.at(Kind::Constant).find(name)->second = getAllocatingValue();
         info("Constant variable: " + name + " allocated");
         break;
       } else {
@@ -700,13 +694,13 @@ any SetVariable::interpret() {
 
     if (lexical_environment->variables.at(Kind::Let).find(name) != 
         lexical_environment->variables.at(Kind::Let).end()) {
-      lexical_environment->variables.at(Kind::Let).find(name)->second = get_allocating_value();
+      lexical_environment->variables.at(Kind::Let).find(name)->second = getAllocatingValue();
       info("Let variable: " + name + " allocated");
       break;
     }
     if (lexical_environment->variables.at(Kind::Variable).find(name) != 
         lexical_environment->variables.at(Kind::Variable).end()) {
-      lexical_environment->variables.at(Kind::Variable).find(name)->second = get_allocating_value();
+      lexical_environment->variables.at(Kind::Variable).find(name)->second = getAllocatingValue();
       info("Var variable: " + name + " allocated");
       break;
     } 
@@ -857,10 +851,6 @@ any FunctionExpression::interpret() {
     // 모든 node는 new로 할당되었으므로 메모리 해제도 interpret이 후 이뤄져야한다.
   try {
     for (auto& node: block) {
-      if (dynamic_cast<Declare*>(node)) info("Declare found");
-      if (dynamic_cast<ExpressionStatement*>(node)) info("ExpressionStatement found");
-      if (dynamic_cast<Return*>(node)) info("return statement found");
-  
       node->interpret();
     }
   } catch(ReturnException return_exception) {
