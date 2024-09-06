@@ -1,5 +1,4 @@
 # B.js
-현재 브랜치는 interpreter 버전입니다. compiler 버전은 codegen 브랜치를 확인하시기 바랍니다(진행중).  
 auto type이 많은 것은 단순히 가독성과 줄맞춤 때문입니다.  
 camel case를 사용한 이유는 c/c++ 내장 함수와 구분짓기 위함입니다.  
 
@@ -16,7 +15,7 @@ Apple clang 14.0.0를 이용하여 컴파일 하였습니다.
 ## 구현된 사양
 1. scope chain
 2. method chaining
-3. function(JS답게 Expression으로 취급. 보통 함수는 Statement로 취급됩니다)
+3. function(JS답게 1급으로 취급)
 4. strict equal등 관계 연산
 5. var, let, const의 특징들
 6. Array, Object(메서드는 Array의 map과 reduce뿐입니다)
